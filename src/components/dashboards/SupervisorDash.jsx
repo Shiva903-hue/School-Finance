@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { User } from "lucide-react";
 import Account from "../pages/accountPages/Account";
 import PendingApproval from '../pages/adminPages/PendingApprovle';
-import Balance from '../pages/adminPages/Balance';
+import Balance2 from '../pages/adminPages/Balance2';
 import Sidebar from "../pages/Sidebar";
 import TopNavbar from "../ui/TopNav";
 
@@ -21,7 +21,7 @@ export default function SupervisorDash() {
       case "pendingApproval":
         return <PendingApproval />;
       case "Balance":
-        return <Balance />;
+        return <Balance2 />;
       case "account":
         return <Account />;
       default:

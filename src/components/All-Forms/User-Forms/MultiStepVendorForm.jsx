@@ -94,21 +94,33 @@ export default function MultiStepVendorForm({ setVendorForm }) {
     return isValid;
   };
 
-  const handleNext = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(2);
-    } else {
+  const handleBankSubmit = async () => {
+    if (!validateStep(1)) {
       showToast("Please fill all required fields correctly", "error");
+      return;
+    }
+
+    try {
+      // Simulate API call for bank details submission
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      showToast("✅ Bank details submitted successfully!", "success");
+      setTimeout(() => {
+        setCurrentStep(2);
+      }, 1000);
+    } catch (error) {
+      console.log(error);
+      showToast("❌ Error submitting bank details", "error");
     }
   };
 
-  const handleSubmit = async () => {
+  const handleVendorSubmit = async () => {
     if (!validateStep(2)) {
       showToast("Please fill all required fields correctly", "error");
       return;
     }
 
     try {
+      // Simulate API call for vendor details submission
       await new Promise((resolve) => setTimeout(resolve, 1000));
       showToast("✅ Vendor created successfully!", "success");
       setTimeout(() => {
@@ -138,7 +150,7 @@ export default function MultiStepVendorForm({ setVendorForm }) {
       }, 2000);
     } catch (error) {
       console.log(error);
-      showToast("❌ Error submitting form", "error");
+      showToast("❌ Error submitting vendor details", "error");
     }
   };
 
@@ -498,15 +510,15 @@ export default function MultiStepVendorForm({ setVendorForm }) {
                   {currentStep === 1 ? (
                     <button
                       type="button"
-                      onClick={handleNext}
+                      onClick={handleBankSubmit}
                       className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-md flex-1 sm:flex-initial"
                     >
-                      Next Step →
+                      Submit Bank Details
                     </button>
                   ) : (
                     <button
                       type="button"
-                      onClick={handleSubmit}
+                      onClick={handleVendorSubmit}
                       className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-md flex-1 sm:flex-initial"
                     >
                       Add Vendor Details
