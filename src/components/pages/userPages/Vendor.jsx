@@ -1,82 +1,50 @@
-import React, { useState } from "react";
+import React, { useState , useEffect} from "react";
 import MultiStepVendorForm from '../../All-Forms/User-Forms/MultiStepVendorForm';
 
 
 export default function Vendor() {
   const [vendorForm, setVendorForm] = useState(false);
-  const mockRows = [
-    {
-      id: 1,
-      name: "Shree Ganesh Electronics",
-      email: "ganesh.electronics@example.com",
-      phone: 9876543210,
-      address: "Nagpur, Maharashtra",
-    },
-    {
-      id: 2,
-      name: "Mehta Textiles",
-      email: "mehta.textiles@example.com",
-      phone: 9123456789,
-      address: "Surat, Gujarat",
-    },
-    {
-      id: 3,
-      name: "Kumar Book Store",
-      email: "kumar.books@example.com",
-      phone: 9812345678,
-      address: "Patna, Bihar",
-    },
-    {
-      id: 4,
-      name: "Bright Future Coaching",
-      email: "brightfuture@example.com",
-      phone: 9765432109,
-      address: "Lucknow, Uttar Pradesh",
-    },
-    {
-      id: 5,
-      name: "Royal Bakers",
-      email: "royal.bakers@example.com",
-      phone: 9654321098,
-      address: "Pune, Maharashtra",
-    },
-    {
-      id: 6,
-      name: "Delhi Furniture House",
-      email: "delhifurniture@example.com",
-      phone: 9543210987,
-      address: "New Delhi",
-    },
-    {
-      id: 7,
-      name: "Techno World Computers",
-      email: "techworld@example.com",
-      phone: 9432109876,
-      address: "Bengaluru, Karnataka",
-    },
-    {
-      id: 8,
-      name: "Healthy Life Pharmacy",
-      email: "healthylife@example.com",
-      phone: 9321098765,
-      address: "Chennai, Tamil Nadu",
-    },
-    {
-      id: 9,
-      name: "Sunrise Travels",
-      email: "sunrise.travels@example.com",
-      phone: 9210987654,
-      address: "Jaipur, Rajasthan",
-    },
-    {
-      id: 10,
-      name: "Green Valley Nursery",
-      email: "greenvalley@example.com",
-      phone: 9109876543,
-      address: "Kolkata, West Bengal",
-    },
-  ];
+  const [vendorData, setVendorData] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const fetchVendorData = () => {
+    setIsRefreshing(true);
+    try {
+      fetch("http://localhost:8001/api/vendor-info")
+        .then((response) => response.json())
+        .then((data) => {
+          console.log("Fetched vendor info:", data);
+          
+          // Handle different response structures
+          if (Array.isArray(data)) {
+            setVendorData(data);
+          } else if (Array.isArray(data.vendorDetails)) {
+            setVendorData(data.vendorDetails);
+          } else if (Array.isArray(data.vendors)) {
+            setVendorData(data.vendors);
+          } else if (Array.isArray(data.data)) {
+            setVendorData(data.data);
+          } else {
+            setVendorData([]);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching vendor info:", error);
+          setVendorData([]);
+        })
+        .finally(() => {
+          setIsRefreshing(false);
+        });
+    } catch (error) {
+      console.error("Error in useEffect:", error);
+      setVendorData([]);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVendorData();
+  }, []);
   return (
     <section className="p-4 sm:p-6">
       {/* Buttons */}
@@ -85,7 +53,14 @@ export default function Vendor() {
           onClick={() => setVendorForm(true)}
           className="w-full sm:w-auto p-2.5 rounded-lg border transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700 shadow-sm font-medium"
         >
-          Add New Vendor ➕
+          Add New Vendor +
+        </button>
+        <button
+          onClick={fetchVendorData}
+          disabled={isRefreshing}
+          className="w-full sm:w-auto p-2.5 rounded-lg border transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700 shadow-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isRefreshing ? '↻ Refreshing...' : '↻ Refresh'}
         </button>
       </div>
 
@@ -122,25 +97,26 @@ export default function Vendor() {
 
             {/* Table Body - Adapts to cards on mobile */}
             <tbody className="divide-y divide-gray-200 bg-white">
-              {mockRows.map((r) => (
+              {Array.isArray(vendorData) && vendorData.length > 0 ? (
+                vendorData.map((vendor, index) => (
                 <tr
-                  key={r.id}
-                  className="block md:table-row border-b last:border-b-0 md:border-none p-4 md:p-0"
+                  key={vendor.vendor_id || index}
+                  className="block md:table-row border-b last:border-b-0 md:border-none p-4 md:p-0 hover:bg-gray-50 transition-colors"
                 >
-                  <td className="block md:table-cell lg:border-b-2  px-2 md:px-6 py-1 md:py-4 whitespace-nowrap text-sm text-gray-700 md:text-left text-right before:content-['ID:'] before:font-bold md:before:content-[''] before:float-left">
-                    {r.id}
+                  <td className="block md:table-cell lg:border-b px-2 md:px-6 py-1 md:py-4 whitespace-nowrap text-sm text-gray-700 md:text-left text-right before:content-['ID:_'] before:font-bold md:before:content-[''] before:float-left md:before:float-none">
+                    {vendor.vendor_id}
                   </td>
-                  <td className="block md:table-cell lg:border-b-2 px-2 md:px-6 py-1 md:py-4 whitespace-normal text-sm font-medium text-gray-900 md:text-left text-right before:content-['Name:'] before:font-bold md:before:content-[''] before:float-left">
-                    {r.name}
+                  <td className="block md:table-cell lg:border-b px-2 md:px-6 py-1 md:py-4 whitespace-normal text-sm font-medium text-gray-900 md:text-left text-right before:content-['Name:_'] before:font-bold md:before:content-[''] before:float-left md:before:float-none">
+                    {vendor.vendor_name}
                   </td>
-                  <td className="block md:table-cell lg:border-b-2 px-2 md:px-6 py-1 md:py-4 whitespace-normal text-sm text-gray-700 md:text-left text-right before:content-['Email:'] before:font-bold md:before:content-[''] before:float-left">
-                    {r.email}
+                  <td className="block md:table-cell lg:border-b px-2 md:px-6 py-1 md:py-4 whitespace-normal text-sm text-gray-700 md:text-left text-right before:content-['Email:_'] before:font-bold md:before:content-[''] before:float-left md:before:float-none break-all">
+                    {vendor.vendor_email  || 'noemail@email.com'}
                   </td>
-                  <td className="block md:table-cell lg:border-b-2 px-2 md:px-6 py-1 md:py-4 whitespace-nowrap text-sm text-gray-700 md:text-left text-right before:content-['Phone:'] before:font-bold md:before:content-[''] before:float-left">
-                    {r.phone}
+                  <td className="block md:table-cell lg:border-b px-2 md:px-6 py-1 md:py-4 whitespace-nowrap text-sm text-gray-700 md:text-left text-right before:content-['Phone:_'] before:font-bold md:before:content-[''] before:float-left md:before:float-none">
+                    {vendor.vendor_mobile}
                   </td>
-                  <td className="block md:table-cell lg:border-b-2 px-2 md:px-6 py-1 md:py-4 whitespace-normal text-sm text-gray-700 md:text-left text-right before:content-['Address:'] before:font-bold md:before:content-[''] before:float-left">
-                    {r.address}
+                  <td className="block md:table-cell lg:border-b px-2 md:px-6 py-1 md:py-4 whitespace-normal text-sm text-gray-700 md:text-left text-right before:content-['Address:_'] before:font-bold md:before:content-[''] before:float-left md:before:float-none">
+                    {vendor.vendor_address}
                   </td>
                   <td className="block md:table-cell lg:border-b-2 px-2 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center justify-end gap-2 mt-4 md:mt-0">
@@ -161,7 +137,14 @@ export default function Vendor() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                    {isRefreshing ? 'Loading vendors...' : Array.isArray(vendorData) ? 'No vendors found' : 'Loading vendors...'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

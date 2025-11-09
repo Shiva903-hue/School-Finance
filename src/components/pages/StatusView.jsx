@@ -20,12 +20,23 @@ export default function StatusView() {
   const fetchStatusData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5001/get/requests");
+      const res = await fetch("http://localhost:8001/api/voucher-details");
       if (!res.ok) {
         throw new Error(`Network response was not ok: ${res.status}`);
       }
       const data = await res.json();
-      setStatusData(Array.isArray(data) ? data : []);
+      
+      // Handle different response structures
+      if (Array.isArray(data)) {
+        setStatusData(data);
+      } else if (Array.isArray(data.voucherDetails)) {
+        setStatusData(data.voucherDetails);
+      } else if (Array.isArray(data.data)) {
+        setStatusData(data.data);
+      } else {
+        console.warn("Unexpected data structure:", data);
+        setStatusData([]);
+      }
     } catch (error) {
       console.error("Error fetching processed vouchers:", error);
       setStatusData([]);
@@ -49,7 +60,7 @@ export default function StatusView() {
     return (
       <div className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Processed Vouchers</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Status</h1>
           <button
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg opacity-60 cursor-wait"
             disabled
@@ -73,7 +84,7 @@ export default function StatusView() {
     <div className="p-4 sm:p-6 bg-white shadow-2xl min-h-screen">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          Processed Vouchers
+          Status
         </h1>
         <button
           onClick={handleRefresh}
@@ -93,7 +104,7 @@ export default function StatusView() {
           }`}
         >
           {statusData.map((voucher) => (
-            <StatusCard key={voucher.va_id} voucherData={voucher} />
+            <StatusCard key={voucher.voucher_id} voucherData={voucher} />
           ))}
         </div>
         {refreshing && (

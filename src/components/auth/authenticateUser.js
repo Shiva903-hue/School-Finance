@@ -1,4 +1,3 @@
-// src/auth/authenticateUser.js
 import { ROLE_MATRIX } from "./RoleMatrix";
 
 export const authenticateUser = (email, password) => {

@@ -1,194 +1,225 @@
-import React, { useState, useEffect } from "react";
-
-
-// const getStatusTheme = (status) => {
-//   // Use toUpperCase() here to match the case labels (PENDING, REJECTED, etc.)
-//   const upperStatus = (status || '').toUpperCase();
-  
-//   switch (upperStatus) {
-//     case "PENDING":
-//       return "text-orange-600 border-orange-600 bg-orange-200";
-//     case "REJECTED":
-//       return "text-red-600 border-red-600 bg-red-200";
-//     case "ACCEPTED":
-//       return "text-green-600 border-green-600 bg-green-200";
-//     default:
-//       return "text-gray-600 border-gray-400 bg-gray-100";
-//   }
-// };
-
+import React, { useState, useEffect, useCallback } from "react";
 
 export default function TransactionForm() {
-
-      // --- AutoFill Date ---
-  const getCurrentDate = ()=>{
+  // --- AutoFill Date ---
+  const getCurrentDate = () => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
-  }
+  };
 
+  // ---- State ----
   const [voucherData, setVoucherData] = useState([]);
-  // const [selectedVoucherStatus, setSelectedVoucherStatus] = useState("");
+  const [transactionTypes, setTransactionTypes] = useState([]);
 
   const [formData, setFormData] = useState({
-    u_email: "",
-    // t_id: "",
-    t_type: "",
-    t_detail: "",
-    t_date: getCurrentDate(),
+    transaction_type_id: "",
+    transaction_details: "",
+    trns_date: getCurrentDate(),
+    trns_status: "PENDING",
+    voucher_id: "",
+    bank_id: 2,
+  });
+
+ 
+  const [autoFields, setAutoFields] = useState({
+    p_name: "",
     t_amount: "",
     v_name: "",
-    t_mode: "",
-    status: "", 
-    va_id: "",
-    p_name: "",
-    P_amount: "",
+    vendor_id: "",
   });
-  const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    const fetchVouchers = async () => {
-      try {
-        const response = await fetch("http://localhost:5001/get/voucherdata");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        setVoucherData(data);
-      } catch (e) {
-        console.error(
-          "Could not fetch voucher data. Backend server might not be running: ",
-          e
-        );
-      }
-    };
-    fetchVouchers();
+  const [errors, setErrors] = useState({});
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
+
+  const showToast = useCallback((message, type) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "" });
+    }, 3000);
   }, []);
 
+  //* Validation helper
   const validateField = (name, value, type) => {
     let error = "";
+
+    // Treat empty strings/null/undefined as missing (unless allowed)
     if (value === "" || value === null || value === undefined) {
-      if (name !== 't_detail') {
+      //transaction_details is optional in your original logic
+      if (name !== "transaction_details") {
         error = "This field is required";
       }
     } else {
       if (type === "number" && !/^\d*\.?\d*$/.test(String(value))) {
         error = "Only numbers are allowed";
       }
+      // name-like fields should be alphabets & spaces only (original logic)
       if (name.toLowerCase().includes("name") && !/^[a-zA-Z\s]+$/.test(value)) {
         error = "Only alphabets are allowed";
       }
     }
+
     return error;
   };
 
+  // * Fetch dropdown data (vouchers + transaction types)
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        //* Vouchers
+        const voucherRes = await fetch(
+          "http://localhost:8001/api/dropdown/voucher-ids"
+        );
+        const voucherJson = await voucherRes.json();
+        // accept different response shapes
+        if (voucherJson && Array.isArray(voucherJson.voucherIDs)) {
+          setVoucherData(voucherJson.voucherIDs);
+        } else if (Array.isArray(voucherJson.data)) {
+          setVoucherData(voucherJson.data);
+        } else if (Array.isArray(voucherJson)) {
+          setVoucherData(voucherJson);
+        } else {
+          setVoucherData([]);
+        }
+
+        //* Transaction types
+        const typeRes = await fetch(
+          "http://localhost:8001/api/dropdown/transaction-types"
+        );
+        const typeJson = await typeRes.json();
+        console.log("Fetched transaction types:", typeJson);
+
+        if (typeJson && Array.isArray(typeJson.transactionTypes)) {
+          setTransactionTypes(typeJson.transactionTypes);
+        } else if (Array.isArray(typeJson.data)) {
+          setTransactionTypes(typeJson.data);
+        } else if (Array.isArray(typeJson)) {
+          setTransactionTypes(typeJson);
+        } else {
+          setTransactionTypes([]);
+        }
+      } catch (err) {
+        console.error("Dropdown fetch error:", err);
+      }
+    };
+
+    fetchDropdownData();
+  }, []);
+
+  //*   handler with validation + autofill voucher logic 
   const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    
-    // Update form data state
+    const { name, value } = e.target;
+
+    // Update form data
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "va_id") {
+    //* Auto-fill when voucher changes
+    if (name === "voucher_id") {
       const selectedVoucher = voucherData.find(
-        (voucher) => String(voucher.va_id) === value
+        (v) => String(v.voucher_id) === String(value)
       );
 
       if (selectedVoucher) {
-        setFormData((prev) => ({
-          ...prev,
-          p_name: selectedVoucher.p_name || "",
-          P_amount: selectedVoucher.P_amount || "",
-          t_amount: selectedVoucher.P_amount || "",
-          v_name: selectedVoucher.vender_name || "",
-
-          status: selectedVoucher.v_status || "", 
-        }));
-        // setSelectedVoucherStatus(selectedVoucher.v_status || "N/A");
+        setAutoFields({
+          p_name: selectedVoucher.product_name || "",
+          t_amount: selectedVoucher.product_amount || "",
+          v_name: selectedVoucher.vendor_name || "",
+          vendor_id: selectedVoucher.vendor_id || "",
+        });
       } else {
-        setFormData((prev) => ({
-          ...prev,
-          p_name: "",
-          P_amount: "",
-          t_amount: "",
-          v_name: "",
-          status: "",
-        }));
-        // setSelectedVoucherStatus("");
+        setAutoFields({ p_name: "", t_amount: "", v_name: "", vendor_id: "" });
       }
     }
 
+    // Determine type for validation (number for amounts)
+    const type = ["t_amount", "P_amount"].includes(name) ? "number" : "text";
+    // Note: transaction_details can be optional, but we still validate when not empty
     const error = validateField(name, value, type);
     setErrors((prev) => ({ ...prev, [name]: error }));
   };
 
-
+  // ---- Submit handler (send only required six fields) ----
   const handleSubmit = async (e) => {
     e.preventDefault();
-    let isValid = true;
+
+    //* Prepare payload with only required fields
+    const payload = {
+      transaction_type_id: formData.transaction_type_id,
+      transaction_details: formData.transaction_details,
+      trns_date: formData.trns_date,
+      trns_status: formData.trns_status,
+      voucher_id: formData.voucher_id,
+      bank_id: formData.bank_id,
+    };
+
+    // Validate each required field using same validateField rules
     const tempErrors = {};
-
-    Object.entries(formData).forEach(([name, value]) => {
-      //! t_id is removed form these
-      const type = ["t_amount", "P_amount"].includes(name)
-        ? "number"
-        : "text";
-      
-      if (name === "t_detail") return;
-
-      const error = validateField(name, value, type);
-      if (error) {
+    let isValid = true;
+    for (const [name, value] of Object.entries(payload)) {
+      // choose validation type: only numeric check for amounts if any (none here except bank/voucher ids)
+      const type = ["t_amount", "P_amount"].includes(name) ? "number" : "text";
+      const err = validateField(name, value, type);
+      if (err) {
+        tempErrors[name] = err;
         isValid = false;
-        tempErrors[name] = error;
       }
-    });
+    }
 
-    setErrors(tempErrors);
+    setErrors((prev) => ({ ...prev, ...tempErrors }));
 
     if (!isValid) {
-      alert("Please fix validation errors before submitting.");
+      showToast("Please fix validation errors before submitting.", "error");
       return;
     }
-    
-    try {
-        const res = await fetch("http://localhost:5001/api/transaction", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
-        });
 
-        if (res.ok) {
-            alert("✅ Transaction details inserted successfully");
-            setFormData({
-                u_email: "",
-                // t_id: "",
-                t_type: "",
-                t_detail: "",
-                t_date: "",
-                t_amount: "",
-                v_name: "",
-                t_mode: "",
-                status: "",
-                va_id: "",
-                p_name: "",
-                P_amount: "",
-            });
-            // setSelectedVoucherStatus("");
-            setErrors({});
-        } else {
-            alert("❌ Error sending request");
-        }
-    } catch (error) {
-        console.error("Submission Error:", error);
-        alert("❌ An error occurred while submitting the form.");
+    try {
+      const res = await fetch("http://localhost:8001/api/request/transaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.success) {
+        showToast("Transaction submitted successfully!", "success");
+
+        setFormData({
+          transaction_type_id: "",
+          transaction_details: "",
+          trns_date: getCurrentDate(),
+          trns_status: "PENDING",
+          voucher_id: "",
+          bank_id: 2,
+        });
+        setAutoFields({ p_name: "", t_amount: "", v_name: "", vendor_id: "" });
+        setErrors({});
+      } else {
+        console.error("Transaction submit response:", data);
+        showToast("Error submitting transaction. Check console for details.", "error");
+      }
+    } catch (err) {
+      console.error("Submission error:", err);
+      showToast("Failed to connect to server.", "error");
     }
   };
 
-
   return (
     <div className="w-full px-4 md:px-8 bg-white p-6 rounded-2xl shadow-xl">
-      {/* Header */}
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all ${
+            toast.type === "success"
+              ? "bg-green-500 text-white"
+              : "bg-red-500 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
       <div className="border-b border-gray-100 pb-4 mb-6">
         <h2 className="text-xl md:text-2xl font-bold text-gray-800">
           Transaction Form
@@ -197,176 +228,193 @@ export default function TransactionForm() {
 
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
-          {/* Voucher Information */}
+          {/* Voucher + auto fields */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-4">
             <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
               Voucher Information
             </h3>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              
-              {/* Voucher ID -   */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Voucher ID <span className="text-red-500">*</span>
                 </label>
                 <select
-                  name="va_id"
+                  name="voucher_id"
                   className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
-                    errors.va_id
+                    errors.voucher_id
                       ? "border-red-500 focus:ring-red-300"
                       : "border-gray-200 focus:ring-blue-500"
                   }`}
-                  required
                   onChange={handleChange}
-                  value={formData.va_id || ""}
+                  value={formData.voucher_id || ""}
+                  required
                 >
                   <option value="" disabled>
                     -- Select a Voucher --
                   </option>
-                  {voucherData.map((voucher) => (
-                    <option key={voucher.va_id} value={voucher.va_id}>
-                      {voucher.va_id}
-                    </option>
-                  ))}
+                  {Array.isArray(voucherData) &&
+                    voucherData.map((voucher) => (
+                      <option key={voucher.voucher_id} value={voucher.voucher_id}>
+                        {voucher.voucher_id}
+                      </option>
+                    ))}
                 </select>
-                {errors.va_id && (
-                  <p className="text-red-500 text-sm mt-1">{errors.va_id}</p>
+                {errors.voucher_id && (
+                  <p className="text-red-500 text-sm mt-1">{errors.voucher_id}</p>
                 )}
               </div>
 
-              {/* Product Name -   */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Product Name <span className="text-red-500">*</span>
+                  Product Name
                 </label>
                 <input
                   type="text"
-                  name="p_name"
-                  placeholder="Product Name"
-                  className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
-                  required
+                  value={autoFields.p_name}
                   readOnly
-                  value={formData.p_name || ""}
+                  className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Vendor Name
+                </label>
+                <input
+                  name="v_name"
+                  placeholder="Vendor"
+                  value={autoFields.v_name}
+                  readOnly
+                  className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Transaction Amount
+                </label>
+                <input
+                  type="text"
+                  name="t_amount"
+                  placeholder="Amount"
+                  value={autoFields.t_amount}
+                  readOnly
+                  className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
                 />
               </div>
             </div>
           </div>
-          
-          {/* Transaction Details -   */}
 
+          {/* Transaction Details */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-4">
             <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
               Transaction Details
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
-              {/* Mode of Deposit (Radio) -   */}
+              {/* Transaction Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mode of Deposit <span className="text-red-500">*</span>
+                  Transaction Type <span className="text-red-500">*</span>
                 </label>
                 <select
-                  name="t_mode"
+                  name="transaction_type_id"
                   className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
-                    errors.t_mode
+                    errors.transaction_type_id
                       ? "border-red-500 focus:ring-red-300"
                       : "border-gray-200 focus:ring-blue-500"
                   }`}
                   onChange={handleChange}
-                  value={formData.t_mode || ""}
+                  value={formData.transaction_type_id || ""}
+                  required
                 >
                   <option value="" disabled>
                     -- Select Mode of Deposit --
                   </option>
-                  <option value="Cash">Cash</option>
-                  <option value="Online">Online</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="RTGS">RTGS</option>
-                  <option value="DD">DD</option>
+                  {Array.isArray(transactionTypes) &&
+                    transactionTypes.map((type) => (
+                      <option
+                        key={type.transaction_type_id}
+                        value={type.transaction_type_id}
+                      >
+                        {type.transaction_type}
+                      </option>
+                    ))}
                 </select>
-                {errors.t_mode && (
-                  <p className="text-red-500 text-sm mt-1">{errors.t_mode}</p>
+                {errors.transaction_type_id && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.transaction_type_id}
+                  </p>
                 )}
               </div>
 
-              {/* Vendor Name -   */}
-              <div>
+              {/* Readonly bank_id display */}
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vendor Name <span className="text-red-500">*</span>
+                  Bank ID
                 </label>
                 <input
-                  name="v_name"
-                  placeholder="Enter Vendor Name"
-                  className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
-                  required
+                  type="text"
+                  name="bank_id_display"
+                  value={String(formData.bank_id)}
                   readOnly
-                  value={formData.v_name || ""}
-                />
-              </div>
-
-              {/* Transaction Amount -   */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Transaction Amount <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="t_amount"
-                  placeholder="Enter Transaction Amount"
                   className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
-                  required
-                  readOnly
-                  value={formData.t_amount || ""}
                 />
-              </div>
+              
+                <input type="hidden" name="bank_id" value={formData.bank_id} />
+              </div> */}
 
-              {/* Transaction Date -   */}
+
+              {/* Transaction Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Transaction Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
-                  name="t_date"
+                  name="trns_date"
                   className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
-                    errors.t_date
+                    errors.trns_date
                       ? "border-red-500 focus:ring-red-300"
                       : "border-gray-200 focus:ring-blue-500"
                   }`}
-                  required
-                  readOnly
                   onChange={handleChange}
-                  value={formData.t_date || ""}
+                  value={formData.trns_date || getCurrentDate()}
+                  required
                 />
-                {errors.t_date && (
-                  <p className="text-red-500 text-sm mt-1">{errors.t_date}</p>
+                {errors.trns_date && (
+                  <p className="text-red-500 text-sm mt-1">{errors.trns_date}</p>
                 )}
               </div>
-                            {/* Transaction Details (Textarea) -   */}
+
+              {/* Transaction Details textarea */}
               <div className="md:col-span-2 lg:col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Transaction Details
                 </label>
                 <textarea
-                  name="t_detail"
+                  name="transaction_details"
                   placeholder="Enter Transaction details"
                   rows="3"
                   className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
-                    errors.t_detail
+                    errors.transaction_details
                       ? "border-red-500 focus:ring-red-300"
                       : "border-gray-200 focus:ring-blue-500"
                   }`}
                   onChange={handleChange}
-                  value={formData.t_detail || ""}
+                  value={formData.transaction_details || ""}
                 />
-                {errors.t_detail && (
-                  <p className="text-red-500 text-sm mt-1">{errors.t_detail}</p>
+                {errors.transaction_details && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.transaction_details}
+                  </p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Submit Button -   */}
+          {/* Submit */}
           <div className="pt-4">
             <button
               type="submit"

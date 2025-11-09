@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import Deposit from '../../All-Forms/Acc-Forms/Deposit';
 import BankMasterForm from '../../All-Forms/Acc-Forms/BankMasterForm';
-import WithdrawalForm from '../../All-Forms/Acc-Forms/WithdrawalForm';
 import MyBank from '../../All-Forms/Acc-Forms/MyBank';
 
 export default function Account() {
@@ -9,9 +7,7 @@ export default function Account() {
 
   const navItems = [
     { id: 'Create_Bank', label: 'Create Bank' },
-    { id: 'Deposit', label: 'Deposit' },
-    { id: 'Withdrawal', label: 'Withdrawal' },
-    { id: 'MyBank', label: 'My Bank' },
+    { id: 'MyBank', label: 'Banks' },
   ];
 
   const handleItemClick = (itemId) => {
@@ -44,8 +40,8 @@ export default function Account() {
       {/* Content */}
       <div className="px-2 sm:px-4 lg:px-6">
         {activeItem === 'Create_Bank' && <BankMasterForm />}
-        {activeItem === 'Deposit' && <Deposit />}
-        {activeItem === 'Withdrawal' && <WithdrawalForm />}
+        {/* {activeItem === 'Deposit' && <Deposit />} */}
+        {/* {activeItem === 'Withdrawal' && <WithdrawalForm />} */}
         {activeItem === 'MyBank' && <MyBank />}
       </div>
     </div>

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import bgImg from '../../assets/bg.svg'
+import bgImg from "../../assets/bg.svg";
 import { useNavigate } from "react-router-dom";
-import { authenticateUser } from "../auth/authenticateUser";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -11,36 +10,44 @@ const Login = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    const response = authenticateUser(email, password);
-
-    if (!response.success) {
-      setError(response.message);
-      toast.error("Login failed: " + response.message, {
-        position: "top-center",
-        autoClose: 2500,
+    try {
+      const response = await fetch("http://localhost:8001/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
       });
-      return;
-    }
 
-    setError(""); // Clear any previous error
+      const data = await response.json();
+      console.log(data);
+      if (!data.success) {
+        setError(data.message);
+        toast.error("Login failed: " + data.message, {
+          position: "top-center",
+          autoClose: 2500,
+        });
+        return;
+      }
+
+   // Store role locally
+    localStorage.setItem("userRole", data.role);
+
     toast.success("Login successful!", {
       position: "top-center",
-      autoClose: 1500,
+      autoClose: 800,
       onClose: () => {
-        localStorage.setItem("userRole", response.role);
-
-        // Redirect to dashboard based on role
-        switch (response.role) {
-          case "Addmin":
+        switch (data.role) {
+          case "Admin":
             navigate("/admin");
             break;
           case "Supervisor":
             navigate("/supervisor");
             break;
-          case "Banker":
+          case "banker":
             navigate("/banker");
             break;
           case "User":
@@ -51,6 +58,11 @@ const Login = () => {
         }
       },
     });
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Server connection failed");
+    }
   };
 
   return (

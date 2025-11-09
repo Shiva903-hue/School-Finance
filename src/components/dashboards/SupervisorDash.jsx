@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { User } from "lucide-react";
 import Account from "../pages/accountPages/Account";
 import PendingApproval from '../pages/adminPages/PendingApprovle';
-import Balance2 from '../pages/adminPages/Balance2';
 import Sidebar from "../pages/Sidebar";
 import TopNavbar from "../ui/TopNav";
 
@@ -12,7 +11,6 @@ export default function SupervisorDash() {
 
   const navLinks = [
     { id: 'pendingApproval', label: 'Pending Approval' },
-    { id: 'Balance', label: 'Balance' },
     { id: 'account', label: 'Account' },
   ];
 
@@ -20,8 +18,6 @@ export default function SupervisorDash() {
     switch (activeItem) {
       case "pendingApproval":
         return <PendingApproval />;
-      case "Balance":
-        return <Balance2 />;
       case "account":
         return <Account />;
       default:

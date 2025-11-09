@@ -17,7 +17,7 @@ export default function UserDash() {
     { id: "VoucherForm", label: "Voucher Entry" },
     { id: "Transaction", label: "Transaction" },
     { id: "AddVendor", label: "Add Vendor" },
-    { id: "PetiCash", label: "Peti Cash" },
+    { id: "PetiCash", label: "Petty Cash" },
     { id: "status-view", label: "Status View" },
   ];
 

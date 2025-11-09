@@ -1,30 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export default function VoucherForm() {
-    // --- AutoFill Date ---
-  const getCurrentDate = ()=>{
+  // --- AutoFill Date ---
+  const getCurrentDate = () => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
-  }
+  };
   // --- STATE MANAGEMENT ---
-  const [vendorDetails, setVendorDetails] = useState([]);
+  const [vendorNames, setVendorNames] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [formData, setFormData] = useState({
-    u_id: "",
-    v_date: getCurrentDate(),
-    p_name: "",
-    p_rate: "",
-    P_amount: "",
-    P_quantity: "",
-    mobile: "",
-    v_id: "",
-    vender_name:"",
-    v_status: "PENDING",
+    voucher_entry_date: getCurrentDate(),
+    voucher_status: "PENDING",
+    product_name: "",
+    product_qty: "",
+    product_rate: "",
+    product_amount: "",
+    vendor_id: "",
   });
 
   const [errors, setErrors] = useState({});
+
+  // --- TOAST NOTIFICATION ---
+  const showToast = useCallback((message, type) => {
+    setToast({ show: true, message, type });
+    const timeout = setTimeout(
+      () => setToast({ show: false, message: "", type: "" }),
+      3000
+    );
+    return () => clearTimeout(timeout);
+  }, []);
 
   // --- DATA FETCHING ---
 
@@ -32,27 +40,53 @@ export default function VoucherForm() {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch("http://localhost:5001/get/vendorid");
+        const response = await fetch(
+          "http://localhost:8001/api/dropdown/vendor-names"
+        );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setVendorDetails(data);
-      } catch (e) {
+        
+        // Handle different response structures
+        if (Array.isArray(data)) {
+          setVendorNames(data);
+        } else if (Array.isArray(data.vendorNames)) {
+          setVendorNames(data.vendorNames);
+        } else if (Array.isArray(data.data)) {
+          setVendorNames(data.data);
+        } else {
+          setVendorNames([]);
+        }
+        
+        console.log("Fetched vendor data:", data);
+      } catch (err) {
         console.error(
           "Could not fetch vendor data. Please ensure the backend server is running: ",
-          e
+          err
         );
+        showToast("❌ Failed to load vendors", "error");
       }
     };
 
     fetchVendors();
-  }, []);
+  }, [showToast]);
 
   // --- FORM HANDLERS ---
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-    setFormData((prevData) => ({ ...prevData, [name]: value }));
+    
+    // Update form data
+    const updatedData = { ...formData, [name]: value };
+    
+    // Auto-calculate product_amount when qty or rate changes
+    if (name === "product_qty" || name === "product_rate") {
+      const qty = name === "product_qty" ? parseFloat(value) || 0 : parseFloat(formData.product_qty) || 0;
+      const rate = name === "product_rate" ? parseFloat(value) || 0 : parseFloat(formData.product_rate) || 0;
+      updatedData.product_amount = qty * rate;
+    }
+    
+    setFormData(updatedData);
     validateField(name, value, type);
   };
 
@@ -60,17 +94,17 @@ export default function VoucherForm() {
   const handleVendorChange = (e) => {
     const selectedId = e.target.value;
 
-    const selectedVendor = vendorDetails.find(
-      (vendor) => vendor.v_id.toString() === selectedId
+    const selectedVendor = vendorNames.find(
+      (vendor) => vendor.vendor_id.toString() === selectedId
     );
 
     if (selectedVendor) {
       setFormData((prevData) => ({
         ...prevData,
-        v_id: selectedVendor.v_id, // ✅ store vendor ID (for backend)
-        vender_name: selectedVendor.v_name, // optional (display only)
+        vendor_id: selectedVendor.vendor_id, // ✅ store vendor ID (for backend)
+        vendor_name: selectedVendor.vendor_name, // optional (display only)
       }));
-      setErrors((prev) => ({ ...prev, vender_name: "" }));
+      setErrors((prev) => ({ ...prev, vendor_name: "" }));
     }
   };
 
@@ -87,40 +121,41 @@ export default function VoucherForm() {
 
     if (!isValid) {
       console.error("Validation errors:", errors);
-      alert("Please fix validation errors before submitting.");
+      showToast("❌ Please fix validation errors before submitting", "error");
       return;
     }
 
     try {
-      const res = await fetch("http://localhost:5001/api/voucher", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      const res = await fetch(
+        "http://localhost:8001/api/generate/purchase-voucher",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        }
+      );
       const data = await res.json().catch(() => ({}));
-console.log("Backend response:", res.status, data);
+      console.log("Backend response:", res.status, data);
+
       if (res.ok) {
-        alert("✅ Request sent successfully!");
+        showToast("✅ Voucher created successfully!", "success");
 
         setFormData({
-          u_id: "",
-          v_date: "",
-          p_name: "",
-          p_rate: "",
-          P_amount: "",
-          P_quantity: "",
-          mobile: "",
-          vender_name: "",
-          v_id: "",
-          v_status: "PENDING",
+          voucher_entry_date: getCurrentDate(),
+          voucher_status: "PENDING",
+          product_name: "",
+          product_qty: "",
+          product_rate: "",
+          product_amount: "",
+          vendor_id: "",
         });
         setErrors({});
       } else {
-        alert("Error sending request. Check the console for details.");
+        showToast(data.message || "❌ Failed to create voucher", "error");
       }
     } catch (error) {
       console.error("Submission failed:", error);
-      alert("A network error occurred during submission.");
+      showToast("❌ Network error occurred during submission", "error");
     }
     console.log("Submitting formData:", formData);
   };
@@ -143,10 +178,19 @@ console.log("Backend response:", res.status, data);
     return error === "";
   };
 
-
-
   return (
     <div className="w-full px-4 md:px-8 bg-white p-6 rounded-2xl shadow-xl">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-lg text-white font-medium transition-all ${
+            toast.type === "success" ? "bg-green-500" : "bg-red-500"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
       <div className="border-b border-gray-100 pb-4 mb-6">
         <h2 className="text-xl md:text-2xl font-bold text-gray-800">
           Purchase Voucher
@@ -162,8 +206,8 @@ console.log("Backend response:", res.status, data);
             </label>
             <input
               type="date"
-              name="v_date"
-              value={formData.v_date}
+              name="voucher_entry_date"
+              value={formData.voucher_entry_date}
               onChange={handleChange}
               required
               readOnly
@@ -184,9 +228,9 @@ console.log("Backend response:", res.status, data);
               Vendor Name <span className="text-red-500">*</span>
             </label>
             <select
-              name="v_id"
+              name="vendor_id"
               required
-              value={formData.v_id}
+              value={formData.vendor_id}
               onChange={handleVendorChange}
               className="mt-1 block w-full p-3 text-base border-gray-300 
              focus:outline-none focus:ring-indigo-500  border
@@ -195,38 +239,16 @@ console.log("Backend response:", res.status, data);
               <option value="" disabled>
                 -- Select Vendor Name --
               </option>
-              {vendorDetails.map((vendor) => (
-                <option key={vendor.v_id} value={vendor.v_id}>
-                  {vendor.v_name}
-                </option>
-              ))}
+              {Array.isArray(vendorNames) &&
+                vendorNames.map((vendor) => (
+                  <option key={vendor.vendor_id} value={vendor.vendor_id}>
+                    {vendor.vendor_name}
+                  </option>
+                ))}
             </select>
 
             {errors.Vendor_Name && (
               <p className="text-red-500 text-sm mt-1">{errors.Vendor_Name}</p>
-            )}
-          </div>
-
-          {/* Mobile Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Mobile Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="mobile"
-              value={formData.mobile}
-              onChange={handleChange}
-              placeholder="10-digit mobile number"
-              required
-              className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
-                errors.mobile
-                  ? "border-red-500 focus:ring-red-300"
-                  : "border-gray-200 focus:ring-blue-500"
-              }`}
-            />
-            {errors.mobile && (
-              <p className="text-red-500 text-sm mt-1">{errors.mobile}</p>
             )}
           </div>
 
@@ -237,8 +259,8 @@ console.log("Backend response:", res.status, data);
             </label>
             <input
               type="text"
-              name="p_name"
-              value={formData.p_name}
+              name="product_name"
+              value={formData.product_name}
               onChange={handleChange}
               placeholder="Product Name"
               required
@@ -256,8 +278,8 @@ console.log("Backend response:", res.status, data);
             </label>
             <input
               type="number"
-              name="P_quantity"
-              value={formData.P_quantity}
+              name="product_qty"
+              value={formData.product_qty}
               onChange={handleChange}
               placeholder="Quantity"
               required
@@ -275,8 +297,8 @@ console.log("Backend response:", res.status, data);
             </label>
             <input
               type="number"
-              name="p_rate"
-              value={formData.p_rate}
+              name="product_rate"
+              value={formData.product_rate}
               onChange={handleChange}
               placeholder="Rate"
               required
@@ -294,12 +316,13 @@ console.log("Backend response:", res.status, data);
             </label>
             <input
               type="number"
-              name="P_amount"
-              value={formData.P_amount}
+              name="product_amount"
+              value={formData.product_amount}
               onChange={handleChange}
-              placeholder="Amount"
+              placeholder="Auto-calculated (Qty × Rate)"
               required
-              className={`w-full p-3 border rounded-lg ${
+              readOnly
+              className={`w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed ${
                 errors.P_amount ? "border-red-500" : "border-gray-200"
               }`}
             />
