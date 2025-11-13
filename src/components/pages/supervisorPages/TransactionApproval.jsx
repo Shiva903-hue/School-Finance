@@ -1,48 +1,48 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import VoucherCard from "../../Card/VoucherCard";
+import TransactionApprovalCard from "../../Card/TransactionApprovalCard";
 import { CheckCircle, RefreshCw, Loader2 } from 'lucide-react';
-// import axios from "axios";
 
-export default function PendingApproval() {
-  const [vouchers, setVouchers] = useState([]);
+export default function TransactionApproval() {
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
- 
-  const dataLength = useMemo(() => vouchers.length, [vouchers.length]);
+  const dataLength = useMemo(() => transactions.length, [transactions.length]);
 
-  // Fetch vouchers from server with useCallback to prevent recreation
+  // Fetch transactions from server
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8001/api/voucher-details", {
-        // Add cache control for better performance
+      const res = await fetch("http://localhost:8001/api/trns-info", {
         headers: {
           'Cache-Control': 'no-cache'
         }
       });
       
       if (!res.ok) {
-        console.log("vouchers --> HTTP error");
+        console.log("transactions --> HTTP error");
         throw new Error(`HTTP error! status: ${res.status}`);
-
       }
 
       const data = await res.json();
       
-      // Extract the voucherDetails array from the response
-      const voucherArray = Array.isArray(data) 
+      // Extract the transactions array from the response
+      const transactionArray = Array.isArray(data) 
         ? data 
-        : data.voucherDetails || data.data || [];
+        : data.transactions || data.data || [];
       
-      console.log("vouchers --> ", data);
-      console.log("voucher array --> ", voucherArray);
+      console.log("transactions --> ", data);
+      console.log("transaction array --> ", transactionArray);
       
-      setVouchers(voucherArray);
+      // Filter only PENDING transactions
+      const pendingTransactions = transactionArray.filter(
+        transaction => transaction.trns_status === "PENDING"
+      );
+      
+      setTransactions(pendingTransactions);
 
     } catch (error) {
-      console.log("vouchers --> Error");
-      console.error("Error fetching vouchers:", error);
-      // Optional: Add error state and user notification
+      console.log("transactions --> Error");
+      console.error("Error fetching transactions:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -58,13 +58,13 @@ export default function PendingApproval() {
     fetchData();
   }, [fetchData]);
 
-  // Memoize handlers with useCallback
+  // Handlers to remove transaction from list after approval/rejection
   const handleApprove = useCallback((voucherId) => {
-    setVouchers(prev => prev.filter(voucher => voucher.voucher_id !== voucherId));
+    setTransactions(prev => prev.filter(transaction => transaction.voucher_id !== voucherId));
   }, []);
 
   const handleReject = useCallback((voucherId) => {
-    setVouchers(prev => prev.filter(voucher => voucher.voucher_id !== voucherId));
+    setTransactions(prev => prev.filter(transaction => transaction.voucher_id !== voucherId));
   }, []);
 
   // Enhanced loading skeleton
@@ -73,11 +73,11 @@ export default function PendingApproval() {
       <div className="p-6 bg-gray-50 min-h-screen">
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-          <p className="text-gray-600 text-lg font-medium">Loading vouchers...</p>
+          <p className="text-gray-600 text-lg font-medium">Loading transactions...</p>
           <p className="text-gray-400 text-sm mt-2">Please wait while we fetch your data</p>
         </div>
         
-        {/* Optional: Loading skeleton for better UX */}
+        {/* Loading skeleton for better UX */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white rounded-lg p-6 shadow-sm animate-pulse">
@@ -97,7 +97,7 @@ export default function PendingApproval() {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">
-            Pending Approvals
+            Transaction Approvals
           </h1>
           <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
             {dataLength}
@@ -121,17 +121,17 @@ export default function PendingApproval() {
       {refreshing && (
         <div className="mb-4 flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-lg">
           <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm font-medium">Updating vouchers...</span>
+          <span className="text-sm font-medium">Updating transactions...</span>
         </div>
       )}
 
-      {/* Voucher Cards Grid */}
-      {vouchers.length > 0 && (
+      {/* Transaction Cards Grid */}
+      {transactions.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {vouchers.map((voucher) => (
-            <VoucherCard
-              key={voucher.voucher_id}
-              voucherData={voucher}
+          {transactions.map((transaction, index) => (
+            <TransactionApprovalCard
+              key={`${transaction.voucher_id}-${transaction.transaction_type_id}-${index}`}
+              transactionData={transaction}
               onApprove={handleApprove}
               onReject={handleReject}
             />
@@ -140,7 +140,7 @@ export default function PendingApproval() {
       )}
 
       {/* Empty State */}
-      {vouchers.length === 0 && (
+      {transactions.length === 0 && (
         <div className="text-center py-16 bg-white rounded-lg shadow-sm">
           <div className="flex flex-col items-center">
             <CheckCircle className="w-20 h-20 mb-4 text-green-500 animate-bounce" />
@@ -148,7 +148,7 @@ export default function PendingApproval() {
               All Clear!
             </p>
             <p className="text-gray-500 text-base">
-              No pending approval requests at the moment
+              No pending transaction approval requests at the moment
             </p>
           </div>
         </div>

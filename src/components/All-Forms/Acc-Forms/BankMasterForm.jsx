@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function BankMasterForm() {
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     bank_name: "",
     bank_account_no: "",
@@ -10,10 +12,12 @@ export default function BankMasterForm() {
     state_id: "",
     bank_address: "",
     bank_type: "Self",
+    bank_amount: "",
   });
 
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  const [isCheckingAccount, setIsCheckingAccount] = useState(false);
   
   const [cities, setCities] = useState([]);
   const [states, setStates] = useState([]);
@@ -24,6 +28,43 @@ export default function BankMasterForm() {
   const showToast = useCallback((message, type) => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
+  }, []);
+
+  // Filter cities based on selected state
+  const filteredCities = useMemo(() => {
+    if (!formData.state_id) return cities;
+    return cities.filter((city) => String(city.state_id) === String(formData.state_id));
+  }, [cities, formData.state_id]);
+
+  // Check if account number already exists
+  const checkAccountNumberExists = useCallback(async (accountNumber) => {
+    if (!accountNumber || accountNumber.length < 9) return;
+    
+    setIsCheckingAccount(true);
+    try {
+      const response = await fetch(`http://localhost:8001/api/bank/check-account/${accountNumber}`);
+      const result = await response.json();
+      
+      if (result.exists) {
+        setErrors((prev) => ({ 
+          ...prev, 
+          bank_account_no: "This account number already exists" 
+        }));
+        return false;
+      } else {
+        setErrors((prev) => ({ 
+          ...prev, 
+          bank_account_no: "" 
+        }));
+        return true;
+      }
+    } catch (error) {
+      console.error("Error checking account number:", error);
+      // Don't block submission on network error
+      return true;
+    } finally {
+      setIsCheckingAccount(false);
+    }
   }, []);
 
   // Fetch dropdown data
@@ -72,7 +113,9 @@ export default function BankMasterForm() {
     if (!value) {
       error = "This field is required";
     } else {
-      if (name === "bank_account_no" && !/^\d+$/.test(value)) {
+      if (name === "bank_amount" && !/^\d+$/.test(value)) {
+        error = "Only numbers are allowed";
+      } else if (name === "bank_account_no" && !/^\d+$/.test(value)) {
         error = "Only numbers are allowed";
       } else if (name === "bank_account_no" && (value.length < 9 || value.length > 18)) {
         error = "Account number must be between 9 and 18 digits";
@@ -87,19 +130,46 @@ export default function BankMasterForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: ["city_id", "state_id"].includes(name) ? Number(value) : value,
-    });
+    
+    // Reset city when state changes
+    if (name === "state_id") {
+      setFormData({
+        ...formData,
+        state_id: Number(value),
+        city_id: "", // Reset city selection
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: ["city_id", "state_id"].includes(name) ? Number(value) : value,
+      });
+    }
+    
     validateField(name, value);
+    
+    // Check account number uniqueness on blur (debounced check)
+    if (name === "bank_account_no" && value.length >= 9) {
+      // Clear previous timeout if exists
+      const timeoutId = setTimeout(() => {
+        checkAccountNumberExists(value);
+      }, 500); // Debounce for 500ms
+      
+      return () => clearTimeout(timeoutId);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
     let isValid = true;
     
     // Validate all required fields
-    const requiredFields = ["bank_name", "bank_account_no", "bank_ifsc", "bank_branch", "city_id", "state_id", "bank_address"];
+    const requiredFields = ["bank_name", "bank_account_no", "bank_ifsc", "bank_branch", "city_id", "state_id", "bank_address","bank_amount"];
     requiredFields.forEach((field) => {
       if (!validateField(field, formData[field])) {
         isValid = false;
@@ -108,6 +178,13 @@ export default function BankMasterForm() {
 
     if (!isValid) {
       showToast("Please fill all required fields correctly", "error");
+      return;
+    }
+
+    // Final check for account number uniqueness before submission
+    const accountIsUnique = await checkAccountNumberExists(formData.bank_account_no);
+    if (!accountIsUnique) {
+      showToast("Account number already exists. Please use a different account number.", "error");
       return;
     }
 
@@ -134,6 +211,7 @@ export default function BankMasterForm() {
           state_id: "",
           bank_address: "",
           bank_type: "company",
+          bank_amount: ""
         });
         setErrors({});
       } else {
@@ -192,19 +270,43 @@ export default function BankMasterForm() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Account Number <span className="text-red-500">*</span>
               </label>
+              <div className="relative">
+                <input
+                  onChange={handleChange}
+                  type="text"
+                  name="bank_account_no"
+                  value={formData.bank_account_no}
+                  placeholder="Enter Account Number"
+                  maxLength="18"
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                  required
+                />
+                {isCheckingAccount && (
+                  <div className="absolute right-3 top-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              {renderError("bank_account_no")}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bank Amount <span className="text-red-500">*</span>
+              </label>
               <input
                 onChange={handleChange}
                 type="text"
-                name="bank_account_no"
-                value={formData.bank_account_no}
-                placeholder="Enter Account Number"
+                name="bank_amount"
+                value={formData.bank_amount}
+                placeholder="Enter Amount"
                 maxLength="18"
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
                 required
               />
-              {renderError("bank_account_no")}
+              {renderError("bank_amount")}
             </div>
             <div>
+
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 IFSC Code <span className="text-red-500">*</span>
               </label>
@@ -266,11 +368,18 @@ export default function BankMasterForm() {
                 value={formData.city_id}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
                 required
+                disabled={!formData.state_id}
               >
                 <option value="">
-                  {citiesLoading ? "Loading..." : "Select City"}
+                  {citiesLoading 
+                    ? "Loading..." 
+                    : !formData.state_id 
+                    ? "Select State First" 
+                    : filteredCities.length === 0
+                    ? "No cities available"
+                    : "Select City"}
                 </option>
-                {cities.map((city) => (
+                {filteredCities.map((city) => (
                   <option key={city.city_id} value={city.city_id}>
                     {city.city_name}
                   </option>
@@ -306,6 +415,18 @@ export default function BankMasterForm() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Submission"
+        message="Are you sure you want to add these bank details? Please verify all information before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

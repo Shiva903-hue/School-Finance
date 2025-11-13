@@ -15,7 +15,7 @@ export default function BankerDash() {
     { id: 'Create_Bank', label: 'Create Bank' },
     { id: 'Deposit', label: 'Deposit' },
     { id: 'Withdrawal', label: 'Withdrawal' },
-    { id: 'MyBank', label: 'My Bank' },
+    { id: 'MyBank', label: 'Banks' },
   ];
 
   const handleItemClick = (itemId) => {

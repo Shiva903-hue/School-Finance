@@ -1,7 +1,8 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import school from "../../assets/school.png";
+import ConfirmationDialog from "./ConfirmationDialog";
 
 export default function TopNavbar({
   title = "School Finance",
@@ -9,10 +10,23 @@ export default function TopNavbar({
   setIsSidebarOpen,
   showMenuButton = true,
 }) {
+  const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const toggleSidebar = () => {
     if (setIsSidebarOpen) {
       setIsSidebarOpen(!isSidebarOpen);
     }
+  };
+
+  const handleLogoutClick = (e) => {
+    e.preventDefault();
+    setShowLogoutConfirm(true);
+  };
+
+  const handleLogoutConfirm = () => {
+    setShowLogoutConfirm(false);
+    navigate("/");
   };
 
   return (
@@ -47,18 +61,29 @@ export default function TopNavbar({
         </div>
 
         {/* Right Section - Logout Button */}
-        <Link to="/">
-          <button
-            className="py-1.5 px-3 md:py-2 md:px-5 border rounded-lg 
-                       transition-all duration-200 text-xs md:text-sm font-medium 
-                       hover:bg-red-50 text-red-600 border-red-500 bg-white 
-                       hover:shadow-md active:scale-95
-                       focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
-          >
-            Log Out
-          </button>
-        </Link>
+        <button
+          onClick={handleLogoutClick}
+          className="py-1.5 px-3 md:py-2 md:px-5 border rounded-lg 
+                     transition-all duration-200 text-xs md:text-sm font-medium 
+                     hover:bg-red-50 text-red-600 border-red-500 bg-white 
+                     hover:shadow-md active:scale-95
+                     focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+        >
+          Log Out
+        </button>
       </nav>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogoutConfirm}
+        title="Confirm Logout"
+        message="Are you sure you want to log out? Any unsaved changes will be lost."
+        confirmText="Logout"
+        cancelText="Cancel"
+        type="danger"
+      />
     </header>
   );
 }

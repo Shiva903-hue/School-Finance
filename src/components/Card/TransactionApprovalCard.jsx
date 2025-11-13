@@ -2,39 +2,37 @@ import React, { useState, useCallback, memo } from "react";
 import {
   CheckCircle,
   XCircle,
-  User,
   Calendar,
-  User2Icon,
   Hash,
-  PaintBucket,
   Loader2,
-  Scale,
+  CreditCard,
+  Building2,
+  DollarSign,
+  MessageSquareMore,
 } from "lucide-react";
 
-const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
+const TransactionApprovalCard = memo(({ transactionData, onApprove, onReject }) => {
   const [isDisappearing, setIsDisappearing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // 'APPROVED' or 'REJECTED'
-  const [description, setDescription] = useState("");
+  const [transactionDetails, setTransactionDetails] = useState(transactionData.transaction_details || "");
 
   // API endpoint constant
-  const API_BASE_URL = "http://localhost:8001/api/update/voucher";
+  const API_BASE_URL = "http://localhost:8001/api/update/transaction";
 
-  // ✅ ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
-  
-  // Generic function to handle status updates (DRY principle)
-  const updateVoucherStatus = useCallback(async (status, callback) => {
+  // Generic function to handle status updates
+  const updateTransactionStatus = useCallback(async (status, callback) => {
     if (isProcessing) return;
     
     setIsProcessing(true);
     setError(null);
 
     const payload = {
-      voucher_status: status,
-      voucher_entry_date: new Date().toISOString(),
-      voucher_description: description.trim() || null, // Optional description
+      trns_status: status,
+      trns_date: new Date().toISOString(),
+      transaction_details: transactionDetails.trim() || transactionData.transaction_details || null,
     };
 
     try {
@@ -42,7 +40,7 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
       const response = await fetch(
-        `${API_BASE_URL}/${voucherData.voucher_id}`,
+        `${API_BASE_URL}/${transactionData.voucher_id}`,
         {
           method: "PATCH",
           headers: {
@@ -67,11 +65,11 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
 
       // Notify parent component after animation
       setTimeout(() => {
-        callback(voucherData.voucher_id);
+        callback(transactionData.voucher_id);
       }, 300);
 
     } catch (error) {
-      console.error(`Error ${status.toLowerCase()} voucher:`, error);
+      console.error(`Error ${status.toLowerCase()} transaction:`, error);
       
       if (error.name === 'AbortError') {
         setError('Request timeout. Please try again.');
@@ -81,7 +79,7 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
       
       setIsProcessing(false);
     }
-  }, [isProcessing, voucherData.voucher_id, API_BASE_URL, description]);
+  }, [isProcessing, transactionData.voucher_id, transactionData.transaction_details, API_BASE_URL, transactionDetails]);
 
   //* HANDLE APPROVE
   const handleApprove = useCallback(() => {
@@ -99,26 +97,18 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
   const handleConfirmSubmit = useCallback(() => {
     setShowConfirmDialog(false);
     if (confirmAction === 'APPROVED') {
-      updateVoucherStatus('APPROVED', onApprove);
+      updateTransactionStatus('APPROVED', onApprove);
     } else if (confirmAction === 'REJECTED') {
-      updateVoucherStatus('REJECTED', onReject);
+      updateTransactionStatus('REJECTED', onReject);
     }
-  }, [confirmAction, updateVoucherStatus, onApprove, onReject]);
+  }, [confirmAction, updateTransactionStatus, onApprove, onReject]);
 
   // Cancel confirmation
   const handleCancelConfirm = useCallback(() => {
     setShowConfirmDialog(false);
-    setDescription("");
+    setTransactionDetails(transactionData.transaction_details || "");
     setConfirmAction(null);
-  }, []);
-
-  // Format currency helper
-  const formatCurrency = useCallback((amount) => {
-    if (amount === null || amount === undefined) return "₹ 0.00";
-    // Ensure number
-    const num = Number(amount) || 0;
-    return `₹ ${num.toLocaleString("en-IN")}`;
-  }, []);
+  }, [transactionData.transaction_details]);
 
   // Format date helper
   const formatDate = useCallback((date) => {
@@ -132,8 +122,8 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
     });
   }, []);
 
-  //? --- NOW CHECK RENDERING CONDITION AFTER ALL HOOKS ---
-  if (voucherData.voucher_status && voucherData.voucher_status !== "PENDING" && !isDisappearing) {
+  //? --- Check rendering condition after all hooks ---
+  if (transactionData.trns_status && transactionData.trns_status !== "PENDING" && !isDisappearing) {
     return null;
   }
 
@@ -163,24 +153,24 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
                 Confirm {confirmAction === 'APPROVED' ? 'Approval' : 'Rejection'}
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to {confirmAction === 'APPROVED' ? 'approve' : 'reject'} voucher #{voucherData.voucher_id}?
+                Are you sure you want to {confirmAction === 'APPROVED' ? 'approve' : 'reject'} transaction for voucher #{transactionData.voucher_id}?
               </p>
               
-              {/* Description Input */}
+              {/* Transaction Details Input */}
               <div className="mb-6 text-left">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                  Description (Optional)
+                <label htmlFor="transaction_details" className="block text-sm font-medium text-gray-700 mb-2">
+                  Transaction Details (Optional)
                 </label>
                 <textarea
-                  id="description"
+                  id="transaction_details"
                   rows="3"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Add a note about this decision..."
+                  value={transactionDetails}
+                  onChange={(e) => setTransactionDetails(e.target.value)}
+                  placeholder="Add or update transaction details..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  This description will be saved with the voucher status.
+                  Leave empty to keep existing details, or update as needed.
                 </p>
               </div>
 
@@ -254,7 +244,7 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase">Voucher ID</p>
-              <p className="text-lg font-bold text-gray-900">#{voucherData.voucher_id}</p>
+              <p className="text-lg font-bold text-gray-900">#{transactionData.voucher_id}</p>
             </div>
           </div>
           <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
@@ -265,88 +255,58 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
 
       {/* Main Content */}
       <div className="p-6 space-y-4">
-        {/* User Email */}
+        {/* Transaction Type & Bank */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="bg-gray-700 p-2 rounded-lg">
+              <CreditCard className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-500 uppercase">Transaction Type</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {transactionData.transaction_type || "-"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="bg-gray-700 p-2 rounded-lg">
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-500 uppercase">Bank</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {transactionData.bank_name || "-"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Transaction Date */}
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="bg-blue-500 p-2 rounded-lg">
-            <User className="w-4 h-4 text-white" />
+          <div className="bg-gray-700 p-2 rounded-lg">
+            <Calendar className="w-4 h-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-500 uppercase">Requested By</p>
-            <p className="text-sm font-semibold text-gray-900 truncate" title={voucherData.user_email || "useremail@notfound.com"}>
-              {voucherData.user_email || "useremail@notfound.com"}
+            <p className="text-xs font-medium text-gray-500 uppercase">Transaction Date</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {formatDate(transactionData.trns_date)}
             </p>
           </div>
         </div>
 
-        {/* Vendor & Date */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="bg-gray-700 p-2 rounded-lg">
-              <User2Icon className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-500 uppercase">Vendor</p>
-              <p className="text-sm font-semibold text-gray-900 truncate" title={voucherData.vendor_name}>
-                {voucherData.vendor_name}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="bg-gray-700 p-2 rounded-lg">
-              <Calendar className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-500 uppercase">Date</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {formatDate(voucherData.voucher_entry_date)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Product Details */}
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
-            <User2Icon className="w-4 h-4 text-gray-600" />
-            <h4 className="text-xs font-bold text-gray-700 uppercase">Product Details</h4>
-          </div>
-          
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">Item Name</p>
-              <p className="text-sm font-semibold text-gray-900">{voucherData.product_name}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <PaintBucket className="w-3.5 h-3.5 text-gray-500" />
-                  <p className="text-xs font-medium text-gray-500">Quantity</p>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">{voucherData.product_qty}</p>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Scale className="w-3.5 h-3.5 text-gray-500" />
-                  <p className="text-xs font-medium text-gray-500">Rate</p>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">
-                  {voucherData.product_rate ? `₹${voucherData.product_rate.toLocaleString("en-IN")}` : "N/A"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Total Amount */}
+        {/* Transaction Amount */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-5 shadow-md">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-blue-100 uppercase tracking-wide mb-1">Total Amount</p>
+              <p className="text-xs font-semibold text-blue-100 uppercase tracking-wide mb-1">Transaction Amount</p>
               <p className="text-2xl font-bold text-white">
-                {formatCurrency(voucherData.product_amount)}
+                {transactionData.trns_amount && !isNaN(parseFloat(transactionData.trns_amount))
+                  ? `₹${parseFloat(transactionData.trns_amount).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}`
+                  : "₹ 0.00"}
               </p>
             </div>
             <div className="bg-white/20 backdrop-blur-sm p-3 rounded-lg">
@@ -355,17 +315,17 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
           </div>
         </div>
 
-        {/* Description */}
-        {voucherData.voucher_description && (
+        {/* Transaction Details */}
+        {transactionData.transaction_details && (
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <User2Icon className="w-4 h-4 text-gray-600" />
+              <MessageSquareMore className="w-4 h-4 text-gray-600" />
               <label className="text-xs font-semibold text-gray-700 uppercase">
-                Description
+                Details
               </label>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {voucherData.voucher_description}
+              {transactionData.transaction_details}
             </p>
           </div>
         )}
@@ -377,7 +337,7 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
           <button
             onClick={handleApprove}
             disabled={isProcessing}
-            aria-label="Approve voucher"
+            aria-label="Approve transaction"
             className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
           >
             {isProcessing ? (
@@ -396,7 +356,7 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
           <button
             onClick={handleReject}
             disabled={isProcessing}
-            aria-label="Reject voucher"
+            aria-label="Reject transaction"
             className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
           >
             {isProcessing ? (
@@ -417,6 +377,6 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
   );
 });
 
-VoucherCard.displayName = 'VoucherCard';
+TransactionApprovalCard.displayName = 'TransactionApprovalCard';
 
-export default VoucherCard;
+export default TransactionApprovalCard;

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function WithdrawalForm() {
   const [bankName, setBankName] = useState([]);
   const [errors, setErrors] = useState({});
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     u_email: "",
     // w_id: "",
@@ -67,6 +69,12 @@ export default function WithdrawalForm() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = () => {
+    setShowConfirmDialog(false);
+    
     let isValid = true;
     Object.entries(formData).forEach(([name, value]) => {
       if (
@@ -241,6 +249,18 @@ export default function WithdrawalForm() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Withdrawal"
+        message="Are you sure you want to submit this withdrawal? Please review all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="warning"
+      />
     </div>
   );
 }

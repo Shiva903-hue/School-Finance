@@ -1,68 +1,107 @@
 import React, { useEffect, useState } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function Deposit() {
   const [bankName, setBankName] = useState([]);
+  const [transactionTypes, setTransactionTypes] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [formData, setFormData] = useState({
-    u_id: "",
-    d_amount: "",
-    bank: "", 
-    d_mode: "",
-    cheque_number: "",
-    cheque_date: "",
-    dd_number: "",
-    dd_date: "",
-    dd_amount: "",
+    Txn_amount: "",
+    Bank_id: "", 
+    transaction_type_id: "", 
+    transaction_date: "",
+    cheque_dd_number: "", 
+    rtgs_number: "", 
   });
 
   const [errors, setErrors] = useState({});
 
-  //* Fetch Bank Names form My Bank Table
+  // Toast notification helper
+  const showToast = (message, type) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
+  };
+
+  //* Fetch Bank Names and Transaction Types
   useEffect(() => {
-    const fetchVouchers = async () => {
+    const fetchDropdownData = async () => {
+      // Fetch Banks
       try {
-        const response = await fetch("http://localhost:5001/get/mybankname");
+        const response = await fetch("http://localhost:8001/bank/self");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setBankName(data);
+        const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
+        console.log("Fetched banks:", bankArray);
+        setBankName(bankArray);
       } catch (e) {
-        console.error(
-          "Could not fetch bank data. Backend server might not be running: ",
-          e
-        );
+        console.error("Could not fetch bank data:", e);
+        showToast("Failed to load banks", "error");
+      }
+
+      // Fetch Transaction Types
+      try {
+        const response = await fetch("http://localhost:8001/api/dropdown/transaction-types");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const typesArray = Array.isArray(data) ? data : data.transactionTypes || data.data || [];
+        console.log("Fetched transaction types:", typesArray);
+        setTransactionTypes(typesArray);
+      } catch (e) {
+        console.error("Could not fetch transaction types:", e);
+        showToast("Failed to load transaction types", "error");
       }
     };
-    fetchVouchers();
+
+    fetchDropdownData();
   }, []);
 
   //* Validation function
   const validateField = (name, value) => {
     let error = "";
     
-    // Check for general required field
+    
     if (value === "" || value === null || value === undefined) {
       error = "This field is required";
     } else {
-      // Validation for numeric fields
-      if (
-        [    "u_id",
-          "d_amount",
-          "cheque_number",
-          "dd_number",
-          "dd_amount",
-        ].includes(name)
-      ) {
-        // Allow only digits and ensure it's not a negative number
-        if (!/^\d+$/.test(value)) {
+      // Validation for amount (numeric only, allows decimals)
+      if (name === "Txn_amount") {
+        if (!/^\d+(\.\d{1,2})?$/.test(value)) {
            error = "Only non-negative numbers are allowed";
         }
       }
       
-      // // Validation for email
-      // if (name === "u_email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      //   error = "Invalid email format";
-      // }
+      // Get selected transaction type name for validation
+      const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
+      const typeName = selectedType ? selectedType.transaction_type : "";
+      
+      // Validation for cheque/DD numbers based on transaction type
+      if (name === "cheque_dd_number") {
+        if (typeName === "Demand Draft") {
+          // DD must be exactly 6 digits
+          if (!/^\d{6}$/.test(value)) {
+            error = "DD number must be exactly 6 digits";
+          }
+        } else if (typeName === "Cheque") {
+          // Cheque must be numeric
+          if (!/^\d+$/.test(value)) {
+            error = "Cheque number must contain only numbers";
+          }
+        }
+      }
+      
+      // RTGS number must be exactly 22 alphanumeric characters
+      if (name === "rtgs_number") {
+        if (value.trim() === "") {
+          error = "RTGS number is required";
+        } else if (!/^[A-Za-z0-9]{22}$/.test(value)) {
+          error = "RTGS number must be exactly 22 alphanumeric characters";
+        }
+      }
     }
 
     setErrors((prev) => ({ ...prev, [name]: error }));
@@ -81,14 +120,18 @@ export default function Deposit() {
     e.preventDefault();
     let isValid = true;
 
-    // Define core required fields 
-    const requiredFields = ['u_id', 'd_amount', 'bank', 'd_mode'];
+    // Define core required fields (date is always required)
+    const requiredFields = ['Txn_amount', 'Bank_id', 'transaction_type_id', 'transaction_date'];
     
-    // Add d_mode-specific required fields
-    if (formData.d_mode === "Cheque" || formData.d_mode === "RTGS") {
-        requiredFields.push('cheque_number', 'cheque_date');
-    } else if (formData.d_mode === "DD") {
-        requiredFields.push('dd_number', 'dd_date', 'dd_amount');
+    // Get selected transaction type name
+    const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
+    const typeName = selectedType ? selectedType.transaction_type : "";
+    
+    // Add transaction_type_id-specific required fields
+    if (typeName === "Cheque" || typeName === "Demand Draft") {
+        requiredFields.push('cheque_dd_number');
+    } else if (typeName === "Rtgs") {
+        requiredFields.push('rtgs_number');
     }
     
     // Validate all required fields
@@ -99,26 +142,57 @@ export default function Deposit() {
     });
 
     if (!isValid) {
-      alert("Please fix validation errors before submitting.");
+      showToast("Please fix validation errors before submitting.", "error");
       return;
     }
     
+    // Show confirmation dialog
+    setShowConfirmDialog(true);
+  };
+
+  //* Handle confirmed submission
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
+    // Prepare payload for backend
+    const payload = {
+      Txn_type: "Deposit", // Fixed value
+      Bank_id: parseInt(formData.Bank_id),
+      Txn_amount: parseFloat(formData.Txn_amount),
+      transaction_type_id: parseInt(formData.transaction_type_id),
+      transaction_date: formData.transaction_date || null,
+      cheque_dd_number: formData.cheque_dd_number ? parseInt(formData.cheque_dd_number) : null,
+      rtgs_number: formData.rtgs_number || null,
+    };
+    
     try {
-      const res = await fetch('http://localhost:3001/api/deposit', {
+      const res = await fetch('http://localhost:8001/api/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
-      const msg = await res.text();
-      alert(msg);
+      const result = await res.json();
+      
+      if (res.ok) {
+        showToast(result.message || "Deposit submitted successfully!", "success");
+        // Reset form
+        setFormData({
+          Txn_amount: "",
+          Bank_id: "",
+          transaction_type_id: "",
+          transaction_date: "",
+          cheque_dd_number: "",
+          rtgs_number: ""
+        });
+        setErrors({});
+      } else {
+        showToast(result.message || "Failed to submit deposit", "error");
+      }
     } catch (err) {
       console.error('Error:', err);
-      alert('Failed to submit deposit');
+      showToast('Failed to submit deposit. Please check if server is running.', "error");
     }
-
-    console.log("Form Data:", formData);
-    alert("✅ Deposit submitted successfully!");
   };
 
   const renderError = (name) =>
@@ -126,6 +200,17 @@ export default function Deposit() {
     
   return (
     <div className="w-full bg-white p-4 sm:p-6 rounded-2xl shadow-xl">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-lg text-white font-medium transition-all ${
+            toast.type === "success" ? "bg-green-500" : "bg-red-500"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
       <div className="border-b border-gray-100 pb-4 mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
           Deposit Slip
@@ -146,22 +231,22 @@ export default function Deposit() {
               </label>
               <input
                 type="text"
-                name="d_amount"
-                value={formData.d_amount}
+                name="Txn_amount"
+                value={formData.Txn_amount}
                 onChange={handleChange}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter amount (Numbers only)"
                 required
               />
-              {renderError("d_amount")}
+              {renderError("Txn_amount")}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Select Bank <span className="text-red-500">*</span>
               </label>
               <select
-                name="bank"
-                value={formData.bank}
+                name="Bank_id"
+                value={formData.Bank_id}
                 onChange={handleChange}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
@@ -170,12 +255,27 @@ export default function Deposit() {
                   -- Choose Bank --
                 </option>
                 {bankName.map((bank) => (
-                  <option key={bank.b_name} value={bank.b_name}>
-                    {bank.b_name}
+                  <option key={bank.bank_id} value={bank.bank_id}>
+                    {bank.bank_name}
                   </option>
                 ))}
               </select>
-              {renderError("bank")}
+              {renderError("Bank_id")}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Transaction Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                max={new Date().toISOString().split("T")[0]}
+                name="transaction_date"
+                value={formData.transaction_date}
+                onChange={handleChange}
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              {renderError("transaction_date")}
             </div>
           </div>
           <div>
@@ -183,110 +283,71 @@ export default function Deposit() {
               Mode of Deposit <span className="text-red-500">*</span>
             </label>
             <select
-              name="d_mode"
-              value={formData.d_mode}
+              name="transaction_type_id"
+              value={formData.transaction_type_id}
               onChange={handleChange}
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
               <option value="">Select mode</option>
-              <option value="Cash">Cash</option>
-              <option value="Online">Online</option>
-              <option value="Cheque">Cheque</option>
-              <option value="RTGS">RTGS</option>
-              <option value="DD">DD</option>
+              {transactionTypes.map((type) => (
+                <option key={type.transaction_type_id} value={type.transaction_type_id}>
+                  {type.transaction_type}
+                </option>
+              ))}
             </select>
-            {renderError("d_mode")}
+            {renderError("transaction_type_id")}
           </div>
 
-          {(formData.d_mode === "Cheque" || formData.d_mode === "RTGS") && (
-            <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {formData.d_mode} Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder={`Enter ${formData.d_mode} Number (Numbers only)`}
-                  name="cheque_number"
-                  value={formData.cheque_number}
-                  onChange={handleChange}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                {renderError("cheque_number")}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="cheque_date"
-                  value={formData.cheque_date}
-                  onChange={handleChange}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                {renderError("cheque_date")}
-              </div>
-            </div>
-          )}
-
-          {formData.d_mode === "DD" && (
-            <div className="pt-4 space-y-4">
-              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
-                Demand Draft Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    DD Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="dd_number"
-                    placeholder="Enter DD Number (Numbers only)"
-                    value={formData.dd_number}
-                    onChange={handleChange}
-                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  {renderError("dd_number")}
+          {(() => {
+            const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
+            const typeName = selectedType ? selectedType.transaction_type : "";
+            
+            if (typeName === "Cheque" || typeName === "Demand Draft") {
+              return (
+                <div className="pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {typeName} Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={typeName === "Demand Draft" ? "Enter DD Number (6 digits)" : `Enter ${typeName} Number (Numbers only)`}
+                      name="cheque_dd_number"
+                      value={formData.cheque_dd_number}
+                      onChange={handleChange}
+                      className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      maxLength={typeName === "Demand Draft" ? "6" : undefined}
+                      required
+                    />
+                    {renderError("cheque_dd_number")}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    DD Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="dd_date"
-                    placeholder="DD Date"
-                    value={formData.dd_date}
-                    onChange={handleChange}
-                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  {renderError("dd_date")}
+              );
+            } else if (typeName === "Rtgs") {
+              return (
+                <div className="pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      RTGS Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="rtgs_number"
+                      placeholder="Enter RTGS Number (22 alphanumeric characters)"
+                      value={formData.rtgs_number}
+                      onChange={handleChange}
+                      className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      maxLength="22"
+                      required
+                    />
+                    {renderError("rtgs_number")}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    DD Amount <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="dd_amount"
-                    placeholder="Enter DD Amount (Numbers only)"
-                    value={formData.dd_amount}
-                    onChange={handleChange}
-                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  {renderError("dd_amount")}
-                </div>
-              </div>
-            </div>
-          )}
+              );
+            }
+            return null;
+          })()}
         </div>
 
         <div className="pt-4">
@@ -298,6 +359,18 @@ export default function Deposit() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Deposit"
+        message="Are you sure you want to submit this deposit? Please verify all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

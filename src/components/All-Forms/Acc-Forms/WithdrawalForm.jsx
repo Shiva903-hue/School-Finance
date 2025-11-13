@@ -1,54 +1,108 @@
 import React, { useEffect, useState } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function WithdrawalForm() {
   const [bankName, setBankName] = useState([]);
+  const [transactionTypes, setTransactionTypes] = useState([]);
   const [errors, setErrors] = useState({});
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [formData, setFormData] = useState({
-    u_email: "",
-    w_amount: "",
-    bank_select: "",
-    mode_withdraw: "",
+    Txn_amount: "",
+    Bank_id: "",
+    transaction_type_id: "",
+    transaction_date: "",
+    cheque_dd_number: "",
+    rtgs_number: "",
   });
 
-  //* Fetch Bank Names form My Bank Table
+  // Toast notification helper
+  const showToast = (message, type) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
+  };
+
+  //* Fetch Bank Names and Transaction Types
   useEffect(() => {
-    const fetchVouchers = async () => {
+    const fetchDropdownData = async () => {
+      // Fetch Banks
       try {
-        const response = await fetch("http://localhost:5001/get/mybankname");
+        const response = await fetch("http://localhost:8001/bank/self");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setBankName(data);
+        const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
+        console.log("Fetched banks:", bankArray);
+        setBankName(bankArray);
       } catch (e) {
-        console.error(
-          "Could not fetch bank data. Backend server might not be running: ",
-          e
-        );
+        console.error("Could not fetch bank data:", e);
+        showToast("Failed to load banks", "error");
+      }
+
+      // Fetch Transaction Types
+      try {
+        const response = await fetch("http://localhost:8001/api/dropdown/transaction-types");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const typesArray = Array.isArray(data) ? data : data.transactionTypes || data.data || [];
+        console.log("Fetched transaction types:", typesArray);
+        setTransactionTypes(typesArray);
+      } catch (e) {
+        console.error("Could not fetch transaction types:", e);
+        showToast("Failed to load transaction types", "error");
       }
     };
-    fetchVouchers();
+
+    fetchDropdownData();
   }, []);
 
+  //* Validation function
   const validateField = (name, value) => {
     let error = "";
-    if (!value) {
+    
+    // Check for general required field
+    if (value === "" || value === null || value === undefined) {
       error = "This field is required";
     } else {
-      if (
-        //! w_id is removed form these
-        [ "w_amount", "cheque_number"].includes(name) &&
-        !/^\d+$/.test(value)
-      ) {
-        error = "Only numbers are allowed";
+      // Validation for amount (numeric only, allows decimals)
+      if (name === "Txn_amount") {
+        if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+           error = "Only non-negative numbers are allowed";
+        }
       }
-      if (name === "u_email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        error = "Invalid email format";
+      
+      // Get selected transaction type name for validation
+      const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
+      const typeName = selectedType ? selectedType.transaction_type : "";
+      
+      // Validation for cheque/DD numbers based on transaction type
+      if (name === "cheque_dd_number") {
+        if (typeName === "Demand Draft") {
+          // DD must be exactly 6 digits
+          if (!/^\d{6}$/.test(value)) {
+            error = "DD number must be exactly 6 digits";
+          }
+        } else if (typeName === "Cheque") {
+          // Cheque must be numeric
+          if (!/^\d+$/.test(value)) {
+            error = "Cheque number must contain only numbers";
+          }
+        }
       }
-      if (name === "bank_select" && !/^[a-zA-Z\s]+$/.test(value)) {
-        error = "Only alphabets are allowed";
+      
+      // RTGS number must be exactly 22 alphanumeric characters
+      if (name === "rtgs_number") {
+        if (value.trim() === "") {
+          error = "RTGS number is required";
+        } else if (!/^[A-Za-z0-9]{22}$/.test(value)) {
+          error = "RTGS number must be exactly 22 alphanumeric characters";
+        }
       }
     }
+
     setErrors((prev) => ({ ...prev, [name]: error }));
     return error === "";
   };
@@ -62,31 +116,99 @@ export default function WithdrawalForm() {
   const renderError = (name) =>
     errors[name] && <p className="text-red-500 text-sm mt-1">{errors[name]}</p>;
 
-  const handleSubmit = (e) => {
+  //* HandleSubmit
+  const handleSubmit = async (e) => {
     e.preventDefault();
     let isValid = true;
-    Object.entries(formData).forEach(([name, value]) => {
-      if (
-        formData.mode_withdraw !== "Cheque" &&
-        (name === "cheque_number" || name === "cheque_date")
-      ) {
-        return; // Skip validation for hidden cheque fields
-      }
-      if (!validateField(name, value)) {
+
+    // Define core required fields (date is always required)
+    const requiredFields = ['Txn_amount', 'Bank_id', 'transaction_type_id', 'transaction_date'];
+    
+    // Get selected transaction type name
+    const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
+    const typeName = selectedType ? selectedType.transaction_type : "";
+    
+    // Add transaction_type_id-specific required fields
+    if (typeName === "Cheque" || typeName === "Demand Draft") {
+        requiredFields.push('cheque_dd_number');
+    } else if (typeName === "Rtgs") {
+        requiredFields.push('rtgs_number');
+    }
+    
+    // Validate all required fields
+    requiredFields.forEach((name) => {
+      if (!validateField(name, formData[name])) {
         isValid = false;
       }
     });
 
     if (!isValid) {
-      alert("❌ Please fix validation errors before submitting.");
+      showToast("Please fix validation errors before submitting.", "error");
       return;
     }
-    console.log(formData);
-    alert("✅ Withdrawal submitted successfully!");
+    
+    // Show confirmation dialog
+    setShowConfirmDialog(true);
+  };
+
+  //* Handle confirmed submission
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
+    // Prepare payload for backend
+    const payload = {
+      Txn_type: "Withdrawal", // Fixed value
+      Bank_id: parseInt(formData.Bank_id),
+      Txn_amount: parseFloat(formData.Txn_amount),
+      transaction_type_id: parseInt(formData.transaction_type_id),
+      transaction_date: formData.transaction_date || null,
+      cheque_dd_number: formData.cheque_dd_number ? parseInt(formData.cheque_dd_number) : null,
+      rtgs_number: formData.rtgs_number || null,
+    };
+    
+    try {
+      const res = await fetch('http://localhost:8001/api/withdrawal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      
+      if (res.ok) {
+        showToast(result.message || "Withdrawal submitted successfully!", "success");
+        // Reset form
+        setFormData({
+          Txn_amount: "",
+          Bank_id: "",
+          transaction_type_id: "",
+          transaction_date: "",
+          cheque_dd_number: "",
+          rtgs_number: ""
+        });
+        setErrors({});
+      } else {
+        showToast(result.message || "Failed to submit withdrawal", "error");
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      showToast('Failed to submit withdrawal. Please check if server is running.', "error");
+    }
   };
 
   return (
     <div className="w-full bg-white p-4 sm:p-6 rounded-2xl shadow-xl">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-lg text-white font-medium transition-all ${
+            toast.type === "success" ? "bg-green-500" : "bg-red-500"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
       <div className="border-b border-gray-100 pb-4 mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
           Withdrawal Slip
@@ -106,22 +228,22 @@ export default function WithdrawalForm() {
               </label>
               <input
                 type="text"
-                name="w_amount"
-                value={formData.w_amount}
+                name="Txn_amount"
+                value={formData.Txn_amount}
                 onChange={handleChange}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter amount"
+                placeholder="Enter amount (Numbers only)"
                 required
               />
-              {renderError("w_amount")}
+              {renderError("Txn_amount")}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Select Bank <span className="text-red-500">*</span>
               </label>
               <select
-                name="bank_select"
-                value={formData.bank_select}
+                name="Bank_id"
+                value={formData.Bank_id}
                 onChange={handleChange}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
@@ -130,12 +252,27 @@ export default function WithdrawalForm() {
                   -- Choose Bank --
                 </option>
                 {bankName.map((bank) => (
-                  <option key={bank.b_name} value={bank.b_name}>
-                    {bank.b_name}
+                  <option key={bank.bank_id} value={bank.bank_id}>
+                    {bank.bank_name}
                   </option>
                 ))}
               </select>
-              {renderError("bank_select")}
+              {renderError("Bank_id")}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Transaction Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                max={new Date().toISOString().split("T")[0]}
+                name="transaction_date"
+                value={formData.transaction_date}
+                onChange={handleChange}
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              {renderError("transaction_date")}
             </div>
           </div>
           <div>
@@ -143,51 +280,71 @@ export default function WithdrawalForm() {
               Mode of Withdrawal <span className="text-red-500">*</span>
             </label>
             <select
-              name="mode_withdraw"
-              value={formData.mode_withdraw}
+              name="transaction_type_id"
+              value={formData.transaction_type_id}
               onChange={handleChange}
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
-              <option value=""> --Select Mode-- </option>
-              <option value="Cash">Cash</option>
-              <option value="Cheque">Cheque</option>
+              <option value="">Select mode</option>
+              {transactionTypes.map((type) => (
+                <option key={type.transaction_type_id} value={type.transaction_type_id}>
+                  {type.transaction_type}
+                </option>
+              ))}
             </select>
-            {renderError("mode_withdraw")}
+            {renderError("transaction_type_id")}
           </div>
-          {formData.mode_withdraw === "Cheque" && (
-            <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cheque Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="cheque_number"
-                  placeholder="Enter Cheque Number"
-                  value={formData.cheque_number}
-                  onChange={handleChange}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                {renderError("cheque_number")}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="cheque_date"
-                  value={formData.cheque_date}
-                  onChange={handleChange}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                {renderError("cheque_date")}
-              </div>
-            </div>
-          )}
+
+          {(() => {
+            const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
+            const typeName = selectedType ? selectedType.transaction_type : "";
+            
+            if (typeName === "Cheque" || typeName === "Demand Draft") {
+              return (
+                <div className="pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {typeName} Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={typeName === "Demand Draft" ? "Enter DD Number (6 digits)" : `Enter ${typeName} Number (Numbers only)`}
+                      name="cheque_dd_number"
+                      value={formData.cheque_dd_number}
+                      onChange={handleChange}
+                      className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      maxLength={typeName === "Demand Draft" ? "6" : undefined}
+                      required
+                    />
+                    {renderError("cheque_dd_number")}
+                  </div>
+                </div>
+              );
+            } else if (typeName === "Rtgs") {
+              return (
+                <div className="pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      RTGS Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="rtgs_number"
+                      placeholder="Enter RTGS Number (22 alphanumeric characters)"
+                      value={formData.rtgs_number}
+                      onChange={handleChange}
+                      className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      maxLength="22"
+                      required
+                    />
+                    {renderError("rtgs_number")}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Submit Button */}
@@ -200,6 +357,17 @@ export default function WithdrawalForm() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Withdrawal"
+        message="Are you sure you want to submit this withdrawal? Please review all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

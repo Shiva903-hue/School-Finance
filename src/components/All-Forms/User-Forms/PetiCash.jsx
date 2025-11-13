@@ -1,12 +1,14 @@
 import React, { useState , useCallback} from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function PetiCash() {
   // const [bankList, setBankList] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     Vendor_name: "",
     Txn_description: "",
     Txn_Amount: "",
-    bank_id: "",
+    bank_id: 5,
   });
 
   const [errors, setErrors] = useState({});
@@ -20,33 +22,7 @@ export default function PetiCash() {
   }, []);
 
 
-  //* fetch bank names
-    // useEffect(() => {
-    //   const fetchDropdownData = async () => {
-    //     try {
-    //       const typeRes = await fetch(
-    //         "http://localhost:8001/api/dropdown/banks"
-    //       );
-    //       const typeJson = await typeRes.json();
-    //       console.log("Fetched Banks:", typeJson);
   
-    //       if (typeJson && Array.isArray(typeJson.banks)) {
-    //         setBankList(typeJson.banks);
-    //       } else if (Array.isArray(typeJson.data)) {
-    //         setBankList(typeJson.data);
-    //       } else if (Array.isArray(typeJson)) {
-    //         setBankList(typeJson);
-    //       } else {
-    //         setBankList([]);
-    //       }
-    //     } catch (err) {
-    //       console.error("Dropdown fetch error:", err);
-    //     }
-    //   };
-  
-    //   fetchDropdownData();
-    // }, []);
-
   const validateField = (name, value) => {
     let error = "";
     if (!value) {
@@ -71,6 +47,12 @@ export default function PetiCash() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
     let isValid = true;
     Object.entries(formData).forEach(([name, value]) => {
       if (!validateField(name, value)) {
@@ -158,31 +140,6 @@ export default function PetiCash() {
               />
               {renderError("Vendor_name")}
             </div>
-{/* /Bank id */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bank ID <span className="text-red-500">*</span>
-              </label>
-              <select
-                onChange={handleChange}
-                name="bank_id"
-                value={formData.bank_id}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
-                required
-              >
-                <option value="">Select Bank ID</option>
-               {Array.isArray(bankList) &&
-                 bankList.map((type) => (
-                   <option
-                     key={type.bank_id}
-                     value={type.bank_id}
-                   >
-                     {type.bank_name}
-                   </option>
-                 ))}
-              </select>
-              {renderError("bank_id")}
-            </div> */}
 
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -228,6 +185,18 @@ export default function PetiCash() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Submission"
+        message="Are you sure you want to add this petty cash transaction? Please verify all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

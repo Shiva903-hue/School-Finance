@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function Deposit() {
   const [bankName, setBankName] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     u_email: "",
     // ds_id: "",
@@ -104,6 +106,12 @@ export default function Deposit() {
   //* HandleSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
     let isValid = true;
 
     // Define core required fields 
@@ -410,6 +418,18 @@ export default function Deposit() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Deposit"
+        message="Are you sure you want to submit this deposit? Please review all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

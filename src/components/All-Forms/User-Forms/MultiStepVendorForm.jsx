@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { X } from "lucide-react";
 
 export default function MultiStepVendorForm({ setVendorForm }) {
@@ -41,140 +41,141 @@ export default function MultiStepVendorForm({ setVendorForm }) {
   const [statesLoading, setStatesLoading] = useState(false);
   const [vendorTypesLoading, setVendorTypesLoading] = useState(false);
   const [banksLoading, setBanksLoading] = useState(false);
+  const [selectedState, setSelectedState] = useState("");
 
   const [citiesError, setCitiesError] = useState(null);
   const [statesError, setStatesError] = useState(null);
   const [vendorTypesError, setVendorTypesError] = useState(null);
   const [banksError, setBanksError] = useState(null);
 
-  // ===================== Toast =====================
+  //* ===================== Toast =====================
   const showToast = useCallback((message, type) => {
     setToast({ show: true, message, type });
     const timeout = setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
     return () => clearTimeout(timeout);
   }, []);
 
-  // ===================== Fetch Dropdown Data =====================
+  //* ===================== Computed Filtered Cities =====================
+  const filteredCities = useMemo(() => {
+    if (!selectedState) return cities;
+    return cities.filter((city) => String(city.state_id) === String(selectedState));
+  }, [cities, selectedState]);
+
+  //* ===================== Fetch Dropdown Data =====================
+useEffect(() => {
+  const fetchDropdownData = async () => {
+    setCitiesLoading(true);
+    setStatesLoading(true);
+
+    try {
+      
+      const [citiesRes, statesRes] = await Promise.all([
+        fetch("http://localhost:8001/api/dropdown/city"),
+        fetch("http://localhost:8001/api/dropdown/state"),
+      ]);
+
+      // Check for response status
+      if (!citiesRes.ok) throw new Error("Failed to fetch cities");
+      if (!statesRes.ok) throw new Error("Failed to fetch states");
+
+      
+      const [citiesData, statesData] = await Promise.all([
+        citiesRes.json(),
+        statesRes.json(),
+      ]);
+
+     
+      const cityArray =
+        Array.isArray(citiesData)
+          ? citiesData
+          : citiesData.data || citiesData.cities || [];
+
+      const stateArray =
+        Array.isArray(statesData)
+          ? statesData
+          : statesData.data || statesData.states || [];
+
+      setCities(cityArray);
+      setStates(stateArray);
+
+    } catch (error) {
+      console.error("Dropdown Load Error:", error);
+      setCitiesError(error);
+      setStatesError(error);
+      showToast("Failed to load dropdown data", "error");
+      setCities([]);
+      setStates([]);
+      // setFilteredCities([]);
+    } finally {
+      setCitiesLoading(false);
+      setStatesLoading(false);
+    }
+  };
+
+  fetchDropdownData();
+}, [showToast]);
+
+
   useEffect(() => {
+    if (currentStep !== 2) return; // Lazy-load: only fetch when user enters vendor step
+
+    let cancelled = false;
+    setVendorTypesLoading(true);
+    setBanksLoading(true);
+
     const fetchDropdownData = async () => {
-      // Fetch Cities
-      setCitiesLoading(true);
       try {
-        const citiesRes = await fetch("http://localhost:8001/api/dropdown/city");
-        if (!citiesRes.ok) throw new Error("Failed to fetch cities");
-        const citiesData = await citiesRes.json();
-        if (Array.isArray(citiesData)) setCities(citiesData);
-        else if (Array.isArray(citiesData.data)) setCities(citiesData.data);
-        else if (Array.isArray(citiesData.cities)) setCities(citiesData.cities);
-        else setCities([]);
-      } catch (error) {
-        setCitiesError(error);
-        showToast("Failed to load cities", "error");
-      } finally {
-        setCitiesLoading(false);
-      }
+        // Fetch both concurrently
+        const [vendorTypesRes, banksRes] = await Promise.all([
+          fetch("http://localhost:8001/api/dropdown/vendor-types"),
+          fetch("http://localhost:8001/api/dropdown/banks"),
+        ]);
 
-      // Fetch States
-      setStatesLoading(true);
-      try {
-        const statesRes = await fetch("http://localhost:8001/api/dropdown/state");
-        if (!statesRes.ok) throw new Error("Failed to fetch states");
-        const statesData = await statesRes.json();
-        if (Array.isArray(statesData)) setStates(statesData);
-        else if (Array.isArray(statesData.data)) setStates(statesData.data);
-        else if (Array.isArray(statesData.states)) setStates(statesData.states);
-        else setStates([]);
-      } catch (error) {
-        setStatesError(error);
-        showToast("Failed to load states", "error");
-      } finally {
-        setStatesLoading(false);
-      }
-
-      // Fetch Vendor Types
-      setVendorTypesLoading(true);
-      try {
-        const vendorTypesRes = await fetch("http://localhost:8001/api/dropdown/vendor-types");
         if (!vendorTypesRes.ok) throw new Error("Failed to fetch vendor types");
-        const vendorTypesData = await vendorTypesRes.json();
-        if (Array.isArray(vendorTypesData)) setVendorTypes(vendorTypesData);
-        else if (Array.isArray(vendorTypesData.data)) setVendorTypes(vendorTypesData.data);
-        else if (Array.isArray(vendorTypesData.vendorTypes)) setVendorTypes(vendorTypesData.vendorTypes);
-        else if (Array.isArray(vendorTypesData.types)) setVendorTypes(vendorTypesData.types);
-        else setVendorTypes([]);
-      } catch (error) {
-        setVendorTypesError(error);
-        showToast("Failed to load vendor types", "error");
-      } finally {
-        setVendorTypesLoading(false);
-      }
-
-      // Fetch Banks
-      setBanksLoading(true);
-      try {
-        const banksRes = await fetch("http://localhost:8001/api/dropdown/banks");
         if (!banksRes.ok) throw new Error("Failed to fetch banks");
-        const banksData = await banksRes.json();
-        if (Array.isArray(banksData)) setBanks(banksData);
-        else if (Array.isArray(banksData.data)) setBanks(banksData.data);
-        else if (Array.isArray(banksData.banks)) setBanks(banksData.banks);
-        else setBanks([]);
+
+        const [vendorTypesData, banksData] = await Promise.all([
+          vendorTypesRes.json(),
+          banksRes.json(),
+        ]);
+
+        if (cancelled) return;
+
+        // Normalize vendor types
+        const vtArray = Array.isArray(vendorTypesData)
+          ? vendorTypesData
+          : vendorTypesData.data || vendorTypesData.vendorTypes || vendorTypesData.types || [];
+
+        // Normalize banks
+        const bArray = Array.isArray(banksData)
+          ? banksData
+          : banksData.data || banksData.banks || [];
+
+        setVendorTypes(vtArray);
+        setBanks(bArray);
       } catch (error) {
+        if (cancelled) return;
+        setVendorTypesError(error);
         setBanksError(error);
-        showToast("Failed to load banks", "error");
+        showToast("Failed to load vendor/bank dropdowns", "error");
       } finally {
-        setBanksLoading(false);
+        if (!cancelled) {
+          setVendorTypesLoading(false);
+          setBanksLoading(false);
+        }
       }
     };
 
     fetchDropdownData();
-  }, [showToast]);
 
-
-  useEffect(() => {
-    const fetchDropdownData = async () => {
-       //* Fetch Vendor Types
-      setVendorTypesLoading(true);
-      try {
-        const vendorTypesRes = await fetch("http://localhost:8001/api/dropdown/vendor-types");
-        if (!vendorTypesRes.ok) throw new Error("Failed to fetch vendor types");
-        const vendorTypesData = await vendorTypesRes.json();
-        if (Array.isArray(vendorTypesData)) setVendorTypes(vendorTypesData);
-        else if (Array.isArray(vendorTypesData.data)) setVendorTypes(vendorTypesData.data);
-        else if (Array.isArray(vendorTypesData.vendorTypes)) setVendorTypes(vendorTypesData.vendorTypes);
-        else if (Array.isArray(vendorTypesData.types)) setVendorTypes(vendorTypesData.types);
-        else setVendorTypes([]);
-      } catch (error) {
-        setVendorTypesError(error);
-        showToast("Failed to load vendor types", "error");
-      } finally {
-        setVendorTypesLoading(false);
-      }
-
-      // Fetch Banks
-      setBanksLoading(true);
-      try {
-        const banksRes = await fetch("http://localhost:8001/api/dropdown/banks");
-        if (!banksRes.ok) throw new Error("Failed to fetch banks");
-        const banksData = await banksRes.json();
-        if (Array.isArray(banksData)) setBanks(banksData);
-        else if (Array.isArray(banksData.data)) setBanks(banksData.data);
-        else if (Array.isArray(banksData.banks)) setBanks(banksData.banks);
-        else setBanks([]);
-      } catch (error) {
-        setBanksError(error);
-        showToast("Failed to load banks", "error");
-      } finally {
-        setBanksLoading(false);
-      }
+    return () => {
+      cancelled = true;
     };
-
-    fetchDropdownData();
   }, [showToast, currentStep]);
 
 
 
-  // ===================== Validation =====================
+  //# ===================== Validation =====================
   const validateField = (name, value) => {
     let error = "";
     if (!value) {
@@ -227,6 +228,13 @@ export default function MultiStepVendorForm({ setVendorForm }) {
   // ===================== Input Handlers =====================
   const handleBankChange = (e) => {
     const { name, value } = e.target;
+
+    //* Update selectedState when state changes
+    if (name === "state_id") {
+      setSelectedState(value);
+    }
+
+    //* Update bank details
     setBankDetails({
       ...bankDetails,
       [name]: ["city_id", "state_id"].includes(name) ? Number(value) : value,
@@ -236,6 +244,12 @@ export default function MultiStepVendorForm({ setVendorForm }) {
 
   const handleVendorChange = (e) => {
     const { name, value } = e.target;
+
+    //* Update selectedState when vendor state changes
+    if (name === "state_id") {
+      setSelectedState(value);
+    }
+
     setVendorDetails({
       ...vendorDetails,
       [name]: ["city_id", "state_id", "vendor_type_id", "bank_id"].includes(name) ? Number(value) : value,
@@ -275,7 +289,7 @@ export default function MultiStepVendorForm({ setVendorForm }) {
         setTimeout(() => setCurrentStep(2), 1000);
       } else {
         showToast(result.message || "❌ Failed to submit bank details", "error");
-      }
+      } 
     } catch (error) {
       console.error("Error submitting bank details:", error);
       showToast("❌ Server error while submitting bank details", "error");
@@ -346,7 +360,7 @@ export default function MultiStepVendorForm({ setVendorForm }) {
     }
   };
 
-  // ===================== Render Error Helper =====================
+  //# ===================== Render Error Helper =====================
   const renderError = (name) =>
     errors[name] && <p className="text-red-500 text-xs mt-1">{errors[name]}</p>;
 
@@ -475,6 +489,7 @@ export default function MultiStepVendorForm({ setVendorForm }) {
             {/* Step Content */}
             <div className="flex-grow overflow-y-auto">
               <div className="px-4 sm:px-6 py-4 space-y-4">
+
                 {currentStep === 1 ? (
                   // Bank Details
                   <div className="space-y-4">
@@ -586,8 +601,8 @@ export default function MultiStepVendorForm({ setVendorForm }) {
                           <option value="">
                             {citiesLoading ? "Loading..." : "Select a city"}
                           </option>
-                          {cities.map((city) => (
-                            <option key={ city.city_id} value={city.city_id}>
+                          {filteredCities.map((city) => (
+                            <option key={city.city_id} value={city.city_id}>
                               {city.city_name}
                             </option>
                           ))}
@@ -774,7 +789,7 @@ export default function MultiStepVendorForm({ setVendorForm }) {
                           <option value="">
                             {citiesLoading ? "Loading..." : "Select a city"}
                           </option>
-                          {cities.map((city) => (
+                          {filteredCities.map((city) => (
                             <option key={city.city_id} value={city.city_id}>
                               {city.city_name}
                             </option>

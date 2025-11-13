@@ -1,24 +1,21 @@
-//* used in userdashboard to show voucher status card */
+//* Transaction Status Card Component */
 import {
   Calendar,
   CheckCircle,
   Clock,
   DollarSign,
   Hash,
-  Package,
-  User,
-  User2,
   XCircle,
-  ShoppingBag,
-  TrendingUp,
+  CreditCard,
+  Building2,
   MessageSquareMore,
 } from "lucide-react";
 
-export default function StatusCard({ voucherData }) {
+export default function TransactionStatusCard({ transactionData }) {
   let statusLabel, statusColor, statusIcon, accentColor, gradientFrom, gradientTo;
 
   // Normalize status to uppercase for comparison
-  const status = voucherData.voucher_status?.toUpperCase() || "";
+  const status = transactionData.trns_status?.toUpperCase() || "";
 
   if (status === "PENDING") {
     statusLabel = "PENDING";
@@ -62,7 +59,7 @@ export default function StatusCard({ voucherData }) {
           <div>
             <div className="text-xs text-gray-500 font-medium">Voucher ID</div>
             <div className="font-bold text-xl text-gray-900">
-              #{voucherData.voucher_id}
+              #{transactionData.voucher_id}
             </div>
           </div>
         </div>
@@ -74,80 +71,57 @@ export default function StatusCard({ voucherData }) {
         </span>
       </div>
 
-      {/* User Email */}
-      <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200 mb-4">
-        <User className="w-4 h-4 text-indigo-600" />
-        <div className="flex-1">
-          <div className="text-xs text-gray-500">User Email</div>
-          <div className="text-sm font-semibold text-gray-800 truncate" title={voucherData.user_email || "nouser@email.com"}>
-            {voucherData.user_email || "nouser@email.com"}
-          </div>
-        </div>
-      </div>
-
-      {/* Vendor & Product Info */}
+      {/* Transaction Type & Bank Info */}
       <div className="space-y-3 mb-4">
         <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
-          <User2 className="w-4 h-4 text-blue-600" />
+          <CreditCard className="w-4 h-4 text-purple-600" />
           <div className="flex-1">
-            <div className="text-xs text-gray-500">Vendor</div>
+            <div className="text-xs text-gray-500">Transaction Type</div>
             <div className="text-sm font-semibold text-gray-800">
-              {voucherData.vendor_name}
+              {transactionData.transaction_type || "-"}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
-          <ShoppingBag className="w-4 h-4 text-purple-600" />
+          <Building2 className="w-4 h-4 text-blue-600" />
           <div className="flex-1">
-            <div className="text-xs text-gray-500">Product</div>
-            <div className="text-sm font-semibold text-gray-800 truncate" title={voucherData.product_name}>
-              {voucherData.product_name}
+            <div className="text-xs text-gray-500">Bank</div>
+            <div className="text-sm font-semibold text-gray-800">
+              {transactionData.bank_name || "-"}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quantity & Rate Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-white p-3 rounded-lg border border-gray-200">
-          <div className="text-xs text-gray-500 mb-1">Quantity</div>
-          <div className="text-lg font-bold text-gray-900">
-            {parseInt(voucherData.product_qty).toLocaleString()}
-          </div>
-        </div>
-
-        <div className="bg-white p-3 rounded-lg border border-gray-200">
-          <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            Rate
-          </div>
-          <div className="text-lg font-bold text-gray-900">
-            ₹{parseInt(voucherData.product_rate).toLocaleString()}
-          </div>
-        </div>
-      </div>
-
-{ voucherData.voucher_description && 
-        <div className="bg-white p-3 mb-2 rounded-lg border text-wrap border-gray-200">
+      {/* Transaction Details */}
+      {transactionData.transaction_details && (
+        <div className="bg-white p-3 mb-4 rounded-lg border text-wrap border-gray-200">
           <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
             <MessageSquareMore className="w-3 h-3" />
-            Comment
+            Details
           </div>
           <div className="text-sm text-gray-900">
-            {(voucherData.voucher_description)}
+            {transactionData.transaction_details}
           </div>
-        </div>}
-      {/* Total Amount - Prominent */}
+        </div>
+      )}
+
+      {/* Transaction Amount - Prominent */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-4 mb-4 shadow-md">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg text-blue-100 font-bold">₹</span>
-            {/* <DollarSign className="w-5 h-5 text-blue-100" /> */}
-            <span className="text-sm text-blue-100 font-medium">Total Amount</span>
+            {/* <DollarSign className="w-5 h-5 text-blue-100" />
+             */} <span className="w-5 h-5 text-blue-100 font-bold">₹</span>
+            <span className="text-sm text-blue-100 font-medium">Transaction Amount</span>
           </div>
           <div className="text-2xl font-bold text-white">
-            ₹{parseInt(voucherData.product_amount).toLocaleString()}
+            {transactionData.trns_amount && !isNaN(parseFloat(transactionData.trns_amount))
+              ? `₹${parseFloat(transactionData.trns_amount).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })}`
+              : "-"}
           </div>
         </div>
       </div>
@@ -166,7 +140,7 @@ export default function StatusCard({ voucherData }) {
             </span>
           </div>
           <div className="text-xs text-gray-600 font-semibold">
-            {new Date(voucherData.voucher_entry_date).toLocaleDateString(
+            {new Date(transactionData.trns_date).toLocaleDateString(
               "en-US",
               {
                 month: "short",

@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Usercreation() {
   const [roles, setRoles] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -28,6 +33,12 @@ export default function Usercreation() {
   //* Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Restrict mobile field to numbers only
+    if (name === "mobile" && value && !/^\d*$/.test(value)) {
+      return; // Don't update if non-numeric characters are entered
+    }
+    
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -38,7 +49,9 @@ export default function Usercreation() {
         ...prev,
         [name]: "",
       }));
+    
     }
+      validateField(name, value);
   };
 
   //* Validate password match
@@ -64,6 +77,11 @@ export default function Usercreation() {
   //* send form data to the API
   const hadlesubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
 
     if (!validateForm()) {
       toast.error("Please fix the errors before submitting");
@@ -93,8 +111,6 @@ export default function Usercreation() {
       console.error("Error submitting form:", error);
       toast.error("❌ An error occurred while creating user");
     }
-
-
     // Reset form after a short delay
     setTimeout(() => {
       setFormData({
@@ -109,6 +125,32 @@ export default function Usercreation() {
       setErrors({});
     }, 1500);
   };
+
+    //# ===================== Validation =====================
+  const validateField = (name, value) => {
+    let error = "";
+    if (!value) {
+      error = "This field is required";
+    } else {
+      if (name === "mobile" && !/^\d{10}$/.test(value)) {
+        error = "Enter a valid 10-digit number";
+      }
+      if ((name === "password" || name === "confirmPassword") && (value.length < 4 || value.length > 8)) {
+        error = "Password must be between 4 and 8 characters";
+      }
+      if (name === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        error = "Enter a valid email";
+      }
+    }
+    setErrors((prev) => ({ ...prev, [name]: error }));
+    return error === "";
+  };
+  //# ===================== Render Error Helper =====================
+  const renderError = (name) =>
+    errors[name] && <p className="text-red-500 text-xs mt-1">{errors[name]}</p>;
+
+
+
   return (
     <div className="p-6 min-h-screen bg-gray-50 font-sans">
         
@@ -144,7 +186,7 @@ export default function Usercreation() {
                   htmlFor="name"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Name
+                  Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -156,6 +198,7 @@ export default function Usercreation() {
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
                 />
+                 {renderError("name")}
               </div>
 
               <div>
@@ -163,7 +206,7 @@ export default function Usercreation() {
                   htmlFor="email"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Email Address
+                  Email Address  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -175,6 +218,7 @@ export default function Usercreation() {
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
                 />
+                 {renderError("email")}
               </div>
 
               <div>
@@ -182,7 +226,7 @@ export default function Usercreation() {
                   htmlFor="mobile"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Mobile Number
+                  Mobile Number  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -191,9 +235,13 @@ export default function Usercreation() {
                   value={formData.mobile}
                   onChange={handleChange}
                   placeholder="Enter your mobile number"
+                  maxLength="10"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
                 />
+                {renderError("mobile")}
               </div>
 
               <div>
@@ -201,7 +249,7 @@ export default function Usercreation() {
                   htmlFor="role"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Role
+                  Role  <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="role"
@@ -228,18 +276,33 @@ export default function Usercreation() {
                   htmlFor="password"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Password
+                  Password  <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Create a password"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Create a password"
+                    required
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+                {renderError("password")}
                 {errors.password && (
                   <p className="text-red-500 text-xs mt-1">{errors.password}</p>
                 )}
@@ -250,18 +313,33 @@ export default function Usercreation() {
                   htmlFor="confirmPassword"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Confirm Password
+                  Confirm Password  <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Confirm your password"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Confirm your password"
+                    required
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+                {renderError("confirmPassword")}
                 {errors.confirmPassword && (
                   <p className="text-red-500 text-xs mt-1">
                     {errors.confirmPassword}
@@ -283,6 +361,18 @@ export default function Usercreation() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm User Creation"
+        message="Are you sure you want to create this user account? Please verify all details before confirming."
+        confirmText="Create User"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

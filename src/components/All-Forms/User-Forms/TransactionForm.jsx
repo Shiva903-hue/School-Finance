@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function TransactionForm() {
   // --- AutoFill Date ---
@@ -13,6 +14,9 @@ export default function TransactionForm() {
   // ---- State ----
   const [voucherData, setVoucherData] = useState([]);
   const [transactionTypes, setTransactionTypes] = useState([]);
+  const [bankList, setBankList] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     transaction_type_id: "",
@@ -20,13 +24,13 @@ export default function TransactionForm() {
     trns_date: getCurrentDate(),
     trns_status: "PENDING",
     voucher_id: "",
-    bank_id: 2,
+    bank_id: "",
+    trns_amount: "",
   });
 
- 
   const [autoFields, setAutoFields] = useState({
     p_name: "",
-    t_amount: "",
+    trns_amount: "",
     v_name: "",
     vendor_id: "",
   });
@@ -55,7 +59,7 @@ export default function TransactionForm() {
       if (type === "number" && !/^\d*\.?\d*$/.test(String(value))) {
         error = "Only numbers are allowed";
       }
-      // name-like fields should be alphabets & spaces only (original logic)
+      // name-like fields should be alphabets & spaces only
       if (name.toLowerCase().includes("name") && !/^[a-zA-Z\s]+$/.test(value)) {
         error = "Only alphabets are allowed";
       }
@@ -64,7 +68,7 @@ export default function TransactionForm() {
     return error;
   };
 
-  // * Fetch dropdown data (vouchers + transaction types)
+  // * Fetch dropdown data (vouchers + transaction types + banks)
   useEffect(() => {
     const fetchDropdownData = async () => {
       try {
@@ -100,15 +104,29 @@ export default function TransactionForm() {
         } else {
           setTransactionTypes([]);
         }
+
+        //* Self Banks
+        const bankRes = await fetch("http://localhost:8001/bank/self");
+        const bankJson = await bankRes.json();
+        console.log("Fetched banks raw response:", bankJson);
+
+        const bankArray = Array.isArray(bankJson)
+          ? bankJson
+          : bankJson.bankDetails || bankJson.banks || bankJson.data || [];
+
+        console.log("Processed bank array:", bankArray);
+        console.log("Bank array length:", bankArray.length);
+        setBankList(bankArray);
       } catch (err) {
         console.error("Dropdown fetch error:", err);
+        console.error("Error details:", err.message);
       }
     };
 
     fetchDropdownData();
   }, []);
 
-  //*   handler with validation + autofill voucher logic 
+  //*   handler with validation + autofill voucher logic
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -122,19 +140,66 @@ export default function TransactionForm() {
       );
 
       if (selectedVoucher) {
+        const amount = selectedVoucher.product_amount || "";
         setAutoFields({
           p_name: selectedVoucher.product_name || "",
-          t_amount: selectedVoucher.product_amount || "",
+          trns_amount: amount,
           v_name: selectedVoucher.vendor_name || "",
           vendor_id: selectedVoucher.vendor_id || "",
         });
+
+        setFormData((prev) => ({ ...prev, trns_amount: amount }));
       } else {
-        setAutoFields({ p_name: "", t_amount: "", v_name: "", vendor_id: "" });
+        setAutoFields({
+          p_name: "",
+          trns_amount: "",
+          v_name: "",
+          vendor_id: "",
+        });
+        setFormData((prev) => ({ ...prev, trns_amount: "" }));
+      }
+    }
+
+    //* Show bank dropdown for Cheque, DD, RTGS
+    if (name === "transaction_type_id") {
+      const selectedType = transactionTypes.find(
+        (t) => String(t.transaction_type_id) === String(value)
+      );
+
+      console.log("Selected transaction type:", selectedType);
+
+      if (selectedType) {
+        const typeName = selectedType.transaction_type.toLowerCase();
+        console.log("Transaction type name:", typeName);
+
+        const shouldShowBank =
+          typeName === "cheque" ||
+          typeName === "dd" ||
+          typeName === "demand draft" ||
+          typeName === "rtgs";
+
+        console.log("Should show bank dropdown:", shouldShowBank);
+        console.log("Bank list in state:", bankList);
+
+        setShowBankDropdown(shouldShowBank);
+
+        // Set bank_id to null for Cash, empty string for others (to be selected)
+        if (!shouldShowBank) {
+          setFormData((prev) => ({ ...prev, bank_id: null }));
+          // Clear bank validation error if exists
+          setErrors((prev) => {
+            const newErrors = { ...prev };
+            delete newErrors.bank_id;
+            return newErrors;
+          });
+        } else {
+          setFormData((prev) => ({ ...prev, bank_id: "" }));
+        }
       }
     }
 
     // Determine type for validation (number for amounts)
-    const type = ["t_amount", "P_amount"].includes(name) ? "number" : "text";
+    const type = ["trns_amount", "P_amount"].includes(name) ? "number" : "text";
     // Note: transaction_details can be optional, but we still validate when not empty
     const error = validateField(name, value, type);
     setErrors((prev) => ({ ...prev, [name]: error }));
@@ -143,23 +208,36 @@ export default function TransactionForm() {
   // ---- Submit handler (send only required six fields) ----
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
 
-    //* Prepare payload with only required fields
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+
+    //* Prepare payload with all required fields including trns_amount
     const payload = {
-      transaction_type_id: formData.transaction_type_id,
+      transaction_type_id: parseInt(formData.transaction_type_id),
       transaction_details: formData.transaction_details,
       trns_date: formData.trns_date,
       trns_status: formData.trns_status,
-      voucher_id: formData.voucher_id,
-      bank_id: formData.bank_id,
+      voucher_id: parseInt(formData.voucher_id),
+      bank_id: formData.bank_id ? parseInt(formData.bank_id) : null,
+      trns_amount: parseFloat(formData.trns_amount),
     };
 
     // Validate each required field using same validateField rules
     const tempErrors = {};
     let isValid = true;
     for (const [name, value] of Object.entries(payload)) {
+      // Skip bank_id validation if it's null (Cash transaction)
+      if (name === "bank_id" && value === null) {
+        continue;
+      }
+
       // choose validation type: only numeric check for amounts if any (none here except bank/voucher ids)
-      const type = ["t_amount", "P_amount"].includes(name) ? "number" : "text";
+      const type = ["trns_amount", "P_amount"].includes(name)
+        ? "number"
+        : "text";
       const err = validateField(name, value, type);
       if (err) {
         tempErrors[name] = err;
@@ -191,13 +269,23 @@ export default function TransactionForm() {
           trns_date: getCurrentDate(),
           trns_status: "PENDING",
           voucher_id: "",
-          bank_id: 2,
+          bank_id: null,
+          trns_amount: "",
         });
-        setAutoFields({ p_name: "", t_amount: "", v_name: "", vendor_id: "" });
+        setAutoFields({
+          p_name: "",
+          trns_amount: "",
+          v_name: "",
+          vendor_id: "",
+        });
+        setShowBankDropdown(false);
         setErrors({});
       } else {
         console.error("Transaction submit response:", data);
-        showToast("Error submitting transaction. Check console for details.", "error");
+        showToast(
+          "Error submitting transaction. Check console for details.",
+          "error"
+        );
       }
     } catch (err) {
       console.error("Submission error:", err);
@@ -255,13 +343,18 @@ export default function TransactionForm() {
                   </option>
                   {Array.isArray(voucherData) &&
                     voucherData.map((voucher) => (
-                      <option key={voucher.voucher_id} value={voucher.voucher_id}>
+                      <option
+                        key={voucher.voucher_id}
+                        value={voucher.voucher_id}
+                      >
                         {voucher.voucher_id}
                       </option>
                     ))}
                 </select>
                 {errors.voucher_id && (
-                  <p className="text-red-500 text-sm mt-1">{errors.voucher_id}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.voucher_id}
+                  </p>
                 )}
               </div>
 
@@ -296,9 +389,9 @@ export default function TransactionForm() {
                 </label>
                 <input
                   type="text"
-                  name="t_amount"
+                  name="trns_amount"
                   placeholder="Amount"
-                  value={autoFields.t_amount}
+                  value={autoFields.trns_amount}
                   readOnly
                   className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
                 />
@@ -349,22 +442,43 @@ export default function TransactionForm() {
                 )}
               </div>
 
-              {/* Readonly bank_id display */}
-              {/* <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bank ID
-                </label>
-                <input
-                  type="text"
-                  name="bank_id_display"
-                  value={String(formData.bank_id)}
-                  readOnly
-                  className="w-full p-3 border rounded-lg bg-gray-100 cursor-not-allowed"
-                />
-              
-                <input type="hidden" name="bank_id" value={formData.bank_id} />
-              </div> */}
-
+              {/* Bank Dropdown - Show for Cheque, DD, RTGS only */}
+              {showBankDropdown && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Bank <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="bank_id"
+                    className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
+                      errors.bank_id
+                        ? "border-red-500 focus:ring-red-300"
+                        : "border-gray-200 focus:ring-blue-500"
+                    }`}
+                    onChange={handleChange}
+                    value={formData.bank_id === null ? "" : formData.bank_id}
+                    required
+                  >
+                    <option value="">-- Select a Bank --</option>
+                    {Array.isArray(bankList) && bankList.length > 0 ? (
+                      bankList.map((bank) => (
+                        <option key={bank.bank_id} value={bank.bank_id}>
+                          {bank.bank_name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        No banks available
+                      </option>
+                    )}
+                  </select>
+                  {errors.bank_id && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.bank_id}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Transaction Date */}
               <div>
@@ -373,6 +487,7 @@ export default function TransactionForm() {
                 </label>
                 <input
                   type="date"
+                  max={getCurrentDate()} // <-- FIXED
                   name="trns_date"
                   className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
                     errors.trns_date
@@ -383,8 +498,11 @@ export default function TransactionForm() {
                   value={formData.trns_date || getCurrentDate()}
                   required
                 />
+
                 {errors.trns_date && (
-                  <p className="text-red-500 text-sm mt-1">{errors.trns_date}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.trns_date}
+                  </p>
                 )}
               </div>
 
@@ -425,6 +543,18 @@ export default function TransactionForm() {
           </div>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Transaction"
+        message="Are you sure you want to submit this transaction? Please verify all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

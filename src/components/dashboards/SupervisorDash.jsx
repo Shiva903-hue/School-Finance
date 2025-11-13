@@ -1,23 +1,27 @@
 import React, { useState } from "react";
 import { User } from "lucide-react";
 import Account from "../pages/accountPages/Account";
-import PendingApproval from '../pages/adminPages/PendingApprovle';
+import PendingApproval from "../pages/adminPages/PendingApprovle";
 import Sidebar from "../pages/Sidebar";
 import TopNavbar from "../ui/TopNav";
+import TransactionApproval from "../pages/supervisorPages/TransactionApproval";
 
 export default function SupervisorDash() {
   const [activeItem, setActiveItem] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navLinks = [
-    { id: 'pendingApproval', label: 'Pending Approval' },
-    { id: 'account', label: 'Account' },
+    { id: "pendingApproval", label: "Voucher Approvals" },
+    { id: "transactionApproval", label: "Transaction Approvals" },
+    { id: "account", label: "Account" },
   ];
 
   const renderComponent = () => {
     switch (activeItem) {
       case "pendingApproval":
         return <PendingApproval />;
+      case "transactionApproval":
+        return <TransactionApproval />;
       case "account":
         return <Account />;
       default:
@@ -47,7 +51,7 @@ export default function SupervisorDash() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top Navbar */}
-      <TopNavbar 
+      <TopNavbar
         title="School Finance"
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}

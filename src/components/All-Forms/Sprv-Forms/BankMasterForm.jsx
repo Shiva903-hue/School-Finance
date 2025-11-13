@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function BankMasterForm() {
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     b_name: "",
     b_accno: "",
@@ -36,6 +38,12 @@ export default function BankMasterForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
     let isValid = true;
     Object.entries(formData).forEach(([name, value]) => {
       if (!validateField(name, value)) {
@@ -191,6 +199,18 @@ export default function BankMasterForm() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Submission"
+        message="Are you sure you want to add these bank details? Please verify all information before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function VoucherForm() {
   // --- AutoFill Date ---
@@ -12,6 +13,7 @@ export default function VoucherForm() {
   // --- STATE MANAGEMENT ---
   const [vendorNames, setVendorNames] = useState([]);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     voucher_entry_date: getCurrentDate(),
     voucher_status: "PENDING",
@@ -110,6 +112,12 @@ export default function VoucherForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmDialog(false);
+    
     let isValid = true;
     // Re-validate all fields on submit
     Object.entries(formData).forEach(([name, value]) => {
@@ -341,6 +349,18 @@ export default function VoucherForm() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmedSubmit}
+        title="Confirm Submission"
+        message="Are you sure you want to submit this voucher? Please review all details before confirming."
+        confirmText="Submit"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }
