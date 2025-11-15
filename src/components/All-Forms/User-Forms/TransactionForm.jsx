@@ -487,7 +487,7 @@ export default function TransactionForm() {
                 </label>
                 <input
                   type="date"
-                  max={getCurrentDate()} // <-- FIXED
+                  max={getCurrentDate()}
                   name="trns_date"
                   className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
                     errors.trns_date

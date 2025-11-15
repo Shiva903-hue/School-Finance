@@ -215,10 +215,10 @@ export default function VoucherForm() {
             <input
               type="date"
               name="voucher_entry_date"
+              max={getCurrentDate()}
               value={formData.voucher_entry_date}
               onChange={handleChange}
               required
-              readOnly
               className={`w-full p-3 border rounded-lg focus:ring-2 transition-all ${
                 errors.v_date
                   ? "border-red-500 focus:ring-red-300"

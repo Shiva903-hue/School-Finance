@@ -8,8 +8,13 @@ export default function PendingApproval() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
- 
-  const dataLength = useMemo(() => vouchers.length, [vouchers.length]);
+  // Filter only PENDING vouchers for display and count
+  const pendingVouchers = useMemo(() => 
+    vouchers.filter(v => v.voucher_status === "PENDING"), 
+    [vouchers]
+  );
+  
+  const dataLength = useMemo(() => pendingVouchers.length, [pendingVouchers.length]);
 
   // Fetch vouchers from server with useCallback to prevent recreation
   const fetchData = useCallback(async () => {
@@ -126,9 +131,9 @@ export default function PendingApproval() {
       )}
 
       {/* Voucher Cards Grid */}
-      {vouchers.length > 0 && (
+      {pendingVouchers.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {vouchers.map((voucher) => (
+          {pendingVouchers.map((voucher) => (
             <VoucherCard
               key={voucher.voucher_id}
               voucherData={voucher}
@@ -140,7 +145,7 @@ export default function PendingApproval() {
       )}
 
       {/* Empty State */}
-      {vouchers.length === 0 && (
+      {pendingVouchers.length === 0 && (
         <div className="text-center py-16 bg-white rounded-lg shadow-sm">
           <div className="flex flex-col items-center">
             <CheckCircle className="w-20 h-20 mb-4 text-green-500 animate-bounce" />

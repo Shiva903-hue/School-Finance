@@ -25,11 +25,21 @@ export default function Balance() {
     setShowBalance(false); // Reset balance display when bank changes
   };
 
-  const handleCheckBalance = () => {
+  const handleCheckBalance = async () => {
     if (selectedBankId) {
-      const selectedBank = bankList.find(bank => bank.bank_id === parseInt(selectedBankId));
-      setSelectedBankAmount(selectedBank ? selectedBank.bank_amount : null);
-      setShowBalance(true);
+      // Fetch fresh data from server
+      try {
+        const response = await fetch("http://localhost:8001/bank/self");
+        const data = await response.json();
+        const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
+        setBankList(bankArray); // Update the bank list with fresh data
+        
+        const selectedBank = bankArray.find(bank => bank.bank_id === parseInt(selectedBankId));
+        setSelectedBankAmount(selectedBank ? selectedBank.bank_amount : null);
+        setShowBalance(true);
+      } catch (error) {
+        console.error("Error fetching updated balance:", error);
+      }
     }
   };
 

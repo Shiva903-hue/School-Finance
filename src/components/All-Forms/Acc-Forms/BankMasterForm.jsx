@@ -210,7 +210,7 @@ export default function BankMasterForm() {
           city_id: "",
           state_id: "",
           bank_address: "",
-          bank_type: "company",
+          bank_type: "Self",
           bank_amount: ""
         });
         setErrors({});

@@ -84,7 +84,7 @@ export default function PetiCash() {
         Vendor_name: "",
         Txn_description: "",
         Txn_Amount: "",
-        bank_id: "",
+        bank_id: 5,
       });
       setErrors({});
     } catch (error) {
