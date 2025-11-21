@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import axios from "axios";
 import TransactionApprovalCard from "../../Card/TransactionApprovalCard";
 import { CheckCircle, RefreshCw, Loader2 } from 'lucide-react';
 
@@ -12,18 +13,13 @@ export default function TransactionApproval() {
   // Fetch transactions from server
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8001/api/trns-info", {
+      const res = await axios.get("http://localhost:8001/api/trns-info", {
         headers: {
           'Cache-Control': 'no-cache'
         }
       });
       
-      if (!res.ok) {
-        console.log("transactions --> HTTP error");
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = res.data;
       
       // Extract the transactions array from the response
       const transactionArray = Array.isArray(data) 
@@ -59,12 +55,12 @@ export default function TransactionApproval() {
   }, [fetchData]);
 
   // Handlers to remove transaction from list after approval/rejection
-  const handleApprove = useCallback((voucherId) => {
-    setTransactions(prev => prev.filter(transaction => transaction.voucher_id !== voucherId));
+  const handleApprove = useCallback((transactionId) => {
+    setTransactions(prev => prev.filter(transaction => transaction.transaction_id !== transactionId));
   }, []);
 
-  const handleReject = useCallback((voucherId) => {
-    setTransactions(prev => prev.filter(transaction => transaction.voucher_id !== voucherId));
+  const handleReject = useCallback((transactionId) => {
+    setTransactions(prev => prev.filter(transaction => transaction.transaction_id !== transactionId));
   }, []);
 
   // Enhanced loading skeleton
@@ -130,7 +126,7 @@ export default function TransactionApproval() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {transactions.map((transaction, index) => (
             <TransactionApprovalCard
-              key={`${transaction.voucher_id}-${transaction.transaction_type_id}-${index}`}
+              key={`${transaction.transaction_id}-${index}`}
               transactionData={transaction}
               onApprove={handleApprove}
               onReject={handleReject}

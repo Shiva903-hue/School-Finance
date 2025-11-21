@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function Deposit() {
   const [bankName, setBankName] = useState([]);
+  const [transactionTypes, setTransactionTypes] = useState([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     u_email: "",
-    // ds_id: "",
     d_amount: "",
     bank: "", 
     d_mode: "",
@@ -30,38 +31,45 @@ export default function Deposit() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [errors, setErrors] = useState({});
 
-  //* Fetch Bank Names form My Bank Table
+  //* Fetch Bank Names and Transaction Types
   useEffect(() => {
-    const fetchVouchers = async () => {
+    const fetchDropdownData = async () => {
+      // Fetch Banks
       try {
-        const response = await fetch("http://localhost:5001/get/mybankname");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const response = await axios.get("http://localhost:5001/get/mybankname");
+        const data = response.data;
         setBankName(data);
       } catch (e) {
         console.error(
-          "Could not fetch bank data. Backend server might not be running: ",
-          e
+          "Could not fetch bank data. Backend server might not be running: ",e
         );
       }
+
+      // Fetch Transaction Types
+      try {
+        const response = await axios.get("http://localhost:8001/api/dropdown/transaction-types");
+        const data = response.data;
+        const typesArray = Array.isArray(data) ? data : data.transactionTypes || data.data || [];
+        console.log("Fetched transaction types:", typesArray);
+        setTransactionTypes(typesArray);
+      } catch (e) {
+        console.error("Could not fetch transaction types:", e);
+      }
     };
-    fetchVouchers();
+    fetchDropdownData();
   }, []);
 
   //* Validation function
   const validateField = (name, value) => {
     let error = "";
     
-    // Check for general required field
+    // Check for all required fields
     if (value === "" || value === null || value === undefined) {
       error = "This field is required";
     } else {
       // Validation for numeric fields
       if (
         [
-          // "ds_id",
           "d_amount",
           "cheque_number",
           "dd_number",
@@ -115,10 +123,8 @@ export default function Deposit() {
     let isValid = true;
 
     // Define core required fields 
-    // ds_id is removed from thses
     const requiredFields = ['u_email',  'd_amount', 'bank', 'd_mode'];
-    
-    // Add d_mode-specific required fields
+
     if (formData.d_mode === "Cheque" || formData.d_mode === "RTGS") {
         requiredFields.push('cheque_number', 'cheque_date');
     } else if (formData.d_mode === "DD") {
@@ -145,21 +151,14 @@ export default function Deposit() {
     }
     
       try {
-      const res = await fetch('http://localhost:3001/api/deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      const msg = await res.text();
-      alert(msg);
+      const res = await axios.post('http://localhost:3001/api/deposit', formData);
+      alert(res.data || "Deposit submitted successfully!");
     } catch (err) {
       console.error('Error:', err);
       alert('Failed to submit deposit');
     }
 
     // Print all data to console
-    // console.log("--- Deposit Form Submitted Data ---");
     console.log("Form Data:", formData);
     if (formData.d_mode === "Cash") {
         console.log("Cash Denominations:", cashNotes);
@@ -167,7 +166,6 @@ export default function Deposit() {
     }
     console.log("-----------------------------------");
     
-    alert("✅ Deposit submitted successfully!");
 
   };
 
@@ -211,22 +209,7 @@ export default function Deposit() {
             Deposit Details
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* ds_id */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Deposit ID <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="ds_id"
-                value={formData.ds_id}
-                onChange={handleChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter deposit ID (Numbers only)"
-                required
-              />
-              {renderError("ds_id")}
-            </div> */}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Amount <span className="text-red-500">*</span>
@@ -276,17 +259,21 @@ export default function Deposit() {
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
-              <option value="">Select mode</option>
-              <option value="Cash">Cash</option>
-              <option value="Online">Online</option>
-              <option value="Cheque">Cheque</option>
-              <option value="RTGS">RTGS</option>
-              <option value="DD">DD</option>
+              <option value="">-- Select Mode --</option>
+              {transactionTypes.length > 0 ? (
+                transactionTypes.map((type) => (
+                  <option key={type.transaction_type_id} value={type.transaction_type}>
+                    {type.transaction_type}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>Loading modes...</option>
+              )}
             </select>
             {renderError("d_mode")}
           </div>
 
-          {formData.d_mode === "Cash" && (
+          {formData.d_mode && formData.d_mode.toLowerCase() === "cash" && (
             <div className="pt-4">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">
                 Cash Denomination Breakdown
@@ -319,7 +306,7 @@ export default function Deposit() {
             </div>
           )}
 
-          {(formData.d_mode === "Cheque" || formData.d_mode === "RTGS") && (
+          {formData.d_mode && (formData.d_mode.toLowerCase() === "cheque" || formData.d_mode.toLowerCase() === "rtgs") && (
             <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -353,7 +340,7 @@ export default function Deposit() {
             </div>
           )}
 
-          {formData.d_mode === "DD" && (
+          {formData.d_mode && (formData.d_mode.toLowerCase() === "dd" || formData.d_mode.toLowerCase() === "demand draft") && (
             <div className="pt-4 space-y-4">
               <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
                 Demand Draft Details

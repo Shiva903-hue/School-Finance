@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 
 export default function MyBank() {
   const [formData, setFormData] = useState({
@@ -50,24 +51,15 @@ export default function MyBank() {
     }
 
     try {
-      const res = await fetch("http://localhost:5001/api/mybank", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      const res = await axios.post("http://localhost:5001/api/mybank", formData);
+      alert("✅ Bank details inserted successfully");
+      setFormData({
+        b_id: "",
+        b_name: "",
+        b_branch: "",
+        b_amount: "",
       });
-
-      if (res.ok) {
-        alert("✅ Bank details inserted successfully");
-        setFormData({
-          b_id: "",
-          b_name: "",
-          b_branch: "",
-          b_amount: "",
-        });
-        setErrors({});
-      } else {
-        alert("❌ Error sending request");
-      }
+      setErrors({});
     } catch (error) {
       console.error("Submission Error:", error);
       alert("❌ An error occurred while submitting the form.");

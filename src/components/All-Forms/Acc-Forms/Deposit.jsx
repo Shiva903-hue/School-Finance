@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function Deposit() {
@@ -28,11 +29,8 @@ export default function Deposit() {
     const fetchDropdownData = async () => {
       // Fetch Banks
       try {
-        const response = await fetch("http://localhost:8001/bank/self");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/bank/self");
+        const data = response.data;
         const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
         console.log("Fetched banks:", bankArray);
         setBankName(bankArray);
@@ -43,11 +41,8 @@ export default function Deposit() {
 
       // Fetch Transaction Types
       try {
-        const response = await fetch("http://localhost:8001/api/dropdown/transaction-types");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/api/dropdown/transaction-types");
+        const data = response.data;
         const typesArray = Array.isArray(data) ? data : data.transactionTypes || data.data || [];
         console.log("Fetched transaction types:", typesArray);
         setTransactionTypes(typesArray);
@@ -68,7 +63,7 @@ export default function Deposit() {
     if (value === "" || value === null || value === undefined) {
       error = "This field is required";
     } else {
-      // Validation for amount (numeric only, allows decimals)
+      // Validation for amount 
       if (name === "Txn_amount") {
         if (!/^\d+(\.\d{1,2})?$/.test(value)) {
            error = "Only non-negative numbers are allowed";
@@ -79,22 +74,22 @@ export default function Deposit() {
       const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
       const typeName = selectedType ? selectedType.transaction_type : "";
       
-      // Validation for cheque/DD numbers based on transaction type
+
       if (name === "cheque_dd_number") {
         if (typeName === "Demand Draft") {
-          // DD must be exactly 6 digits
+          //* DD must be exactly 6 digits
           if (!/^\d{6}$/.test(value)) {
             error = "DD number must be exactly 6 digits";
           }
         } else if (typeName === "Cheque") {
-          // Cheque must be numeric
+          //* Cheque must be numeric
           if (!/^\d+$/.test(value)) {
             error = "Cheque number must contain only numbers";
           }
         }
       }
       
-      // RTGS number must be exactly 22 alphanumeric characters
+      //* RTGS number must be exactly 22 alphanumeric characters
       if (name === "rtgs_number") {
         if (value.trim() === "") {
           error = "RTGS number is required";
@@ -120,14 +115,14 @@ export default function Deposit() {
     e.preventDefault();
     let isValid = true;
 
-    // Define core required fields (date is always required)
+    // Define required fields
     const requiredFields = ['Txn_amount', 'Bank_id', 'transaction_type_id', 'transaction_date'];
     
     // Get selected transaction type name
     const selectedType = transactionTypes.find(t => t.transaction_type_id === parseInt(formData.transaction_type_id));
     const typeName = selectedType ? selectedType.transaction_type : "";
     
-    // Add transaction_type_id-specific required fields
+    // Add transaction_type_id specific required fields
     if (typeName === "Cheque" || typeName === "Demand Draft") {
         requiredFields.push('cheque_dd_number');
     } else if (typeName === "Rtgs") {
@@ -156,7 +151,7 @@ export default function Deposit() {
     
     // Prepare payload for backend
     const payload = {
-      Txn_type: "Deposit", // Fixed value
+      Txn_type: "Deposit",
       Bank_id: parseInt(formData.Bank_id),
       Txn_amount: parseFloat(formData.Txn_amount),
       transaction_type_id: parseInt(formData.transaction_type_id),
@@ -166,32 +161,24 @@ export default function Deposit() {
     };
     
     try {
-      const res = await fetch('http://localhost:8001/api/deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
+      const res = await axios.post('http://localhost:8001/api/deposit', payload);
+      const result = res.data;
       
-      if (res.ok) {
-        showToast(result.message || "Deposit submitted successfully!", "success");
-        // Reset form
-        setFormData({
-          Txn_amount: "",
-          Bank_id: "",
-          transaction_type_id: "",
-          transaction_date: "",
-          cheque_dd_number: "",
-          rtgs_number: ""
-        });
-        setErrors({});
-      } else {
-        showToast(result.message || "Failed to submit deposit", "error");
-      }
+      showToast(result.message || "Deposit submitted successfully!", "success");
+      // Reset form
+      setFormData({
+        Txn_amount: "",
+        Bank_id: "",
+        transaction_type_id: "",
+        transaction_date: "",
+        cheque_dd_number: "",
+        rtgs_number: ""
+      });
+      setErrors({});
     } catch (err) {
       console.error('Error:', err);
-      showToast('Failed to submit deposit. Please check if server is running.', "error");
+      const errorMessage = err.response?.data?.message || 'Failed to submit deposit. Please check if server is running.';
+      showToast(errorMessage, "error");
     }
   };
 

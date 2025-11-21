@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import ConfirmationDialog from "./ConfirmationDialog";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
-import school from "../../assets/school.png";
-import ConfirmationDialog from "./ConfirmationDialog";
+import school from "../../assets/logo.jpg";
+import { AuthContext } from "../../context/AuthContext"; 
 
 export default function TopNavbar({
   title = "School Finance",
@@ -11,7 +12,9 @@ export default function TopNavbar({
   showMenuButton = true,
 }) {
   const navigate = useNavigate();
+  const { logout } = useContext(AuthContext); 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false); 
 
   const toggleSidebar = () => {
     if (setIsSidebarOpen) {
@@ -24,9 +27,26 @@ export default function TopNavbar({
     setShowLogoutConfirm(true);
   };
 
-  const handleLogoutConfirm = () => {
-    setShowLogoutConfirm(false);
-    navigate("/");
+  const handleLogoutConfirm = async () => {
+    setIsLoggingOut(true);
+    
+    try {
+      // logout function to destroy session
+      await logout();
+      console.log('Logout successful, redirecting to login');
+      
+     
+      setShowLogoutConfirm(false);
+      
+      
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error('Logout error:', err);
+      // Still navigate even if logout fails
+      navigate("/", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -53,7 +73,7 @@ export default function TopNavbar({
           <img
             src={school}
             alt="School Finance Logo"
-            className="w-10 h-10 md:w-12 md:h-12 rounded-xl object-cover"
+            className="h-10 w-auto sm:h-12 md:h-14 rounded-xl object-contain"
           />
           <span className="text-lg md:text-xl font-extrabold text-blue-700">
             {title}
@@ -63,26 +83,29 @@ export default function TopNavbar({
         {/* Right Section - Logout Button */}
         <button
           onClick={handleLogoutClick}
+          disabled={isLoggingOut}
           className="py-1.5 px-3 md:py-2 md:px-5 border rounded-lg 
                      transition-all duration-200 text-xs md:text-sm font-medium 
                      hover:bg-red-50 text-red-600 border-red-500 bg-white 
                      hover:shadow-md active:scale-95
-                     focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+                     focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50
+                     disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Log Out
+          {isLoggingOut ? "Logging out..." : "Log Out"}
         </button>
       </nav>
 
       {/* Logout Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
+        onClose={() => !isLoggingOut && setShowLogoutConfirm(false)}
         onConfirm={handleLogoutConfirm}
         title="Confirm Logout"
         message="Are you sure you want to log out? Any unsaved changes will be lost."
-        confirmText="Logout"
+        confirmText={isLoggingOut ? "Logging out..." : "Logout"}
         cancelText="Cancel"
         type="danger"
+        disabled={isLoggingOut}
       />
     </header>
   );

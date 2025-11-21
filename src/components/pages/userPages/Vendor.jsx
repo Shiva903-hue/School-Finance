@@ -1,4 +1,5 @@
 import React, { useState , useEffect} from "react";
+import axios from "axios";
 import MultiStepVendorForm from '../../All-Forms/User-Forms/MultiStepVendorForm';
 import ConfirmationDialog from '../../ui/ConfirmationDialog';
 import { X } from 'lucide-react';
@@ -66,37 +67,29 @@ export default function Vendor() {
     return error === "";
   };
 
-  const fetchVendorData = () => {
+  const fetchVendorData = async () => {
     setIsRefreshing(true);
     try {
-      fetch("http://localhost:8001/api/vendor-info")
-        .then((response) => response.json())
-        .then((data) => {
-          console.log("Fetched vendor info:", data);
-          
-          // Handle different response structures
-          if (Array.isArray(data)) {
-            setVendorData(data);
-          } else if (Array.isArray(data.vendorDetails)) {
-            setVendorData(data.vendorDetails);
-          } else if (Array.isArray(data.vendors)) {
-            setVendorData(data.vendors);
-          } else if (Array.isArray(data.data)) {
-            setVendorData(data.data);
-          } else {
-            setVendorData([]);
-          }
-        })
-        .catch((error) => {
-          console.error("Error fetching vendor info:", error);
-          setVendorData([]);
-        })
-        .finally(() => {
-          setIsRefreshing(false);
-        });
+      const response = await axios.get("http://localhost:8001/api/vendor-info");
+      const data = response.data;
+      console.log("Fetched vendor info:", data);
+      
+      // Handle different response structures
+      if (Array.isArray(data)) {
+        setVendorData(data);
+      } else if (Array.isArray(data.vendorDetails)) {
+        setVendorData(data.vendorDetails);
+      } else if (Array.isArray(data.vendors)) {
+        setVendorData(data.vendors);
+      } else if (Array.isArray(data.data)) {
+        setVendorData(data.data);
+      } else {
+        setVendorData([]);
+      }
     } catch (error) {
-      console.error("Error in useEffect:", error);
+      console.error("Error fetching vendor info:", error);
       setVendorData([]);
+    } finally {
       setIsRefreshing(false);
     }
   };
@@ -113,20 +106,13 @@ export default function Vendor() {
 
   const handleConfirmDelete = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/api/vendor/${vendorToDelete.vendor_id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showToast('Vendor deleted successfully!', 'success');
-        fetchVendorData(); // Refresh the list
-      } else {
-        const result = await response.json();
-        showToast(result.message || 'Failed to delete vendor', 'error');
-      }
+      await axios.delete(`http://localhost:8001/api/vendor/${vendorToDelete.vendor_id}`);
+      showToast('Vendor deleted successfully!', 'success');
+      fetchVendorData(); // Refresh the list
     } catch (error) {
       console.error('Error deleting vendor:', error);
-      showToast('Failed to delete vendor. Please try again.', 'error');
+      const errorMessage = error.response?.data?.message || 'Failed to delete vendor. Please try again.';
+      showToast(errorMessage, 'error');
     } finally {
       setShowDeleteDialog(false);
       setVendorToDelete(null);
@@ -159,25 +145,16 @@ export default function Vendor() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8001/api/vendor/${vendorToUpdate.vendor_id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vendorToUpdate),
-      });
-
-      if (response.ok) {
-        showToast('Vendor updated successfully!', 'success');
-        setShowUpdateDialog(false);
-        setVendorToUpdate(null);
-        setUpdateErrors({});
-        fetchVendorData(); // Refresh the list
-      } else {
-        const result = await response.json();
-        showToast(result.message || 'Failed to update vendor', 'error');
-      }
+      await axios.put(`http://localhost:8001/api/vendor/${vendorToUpdate.vendor_id}`, vendorToUpdate);
+      showToast('Vendor updated successfully!', 'success');
+      setShowUpdateDialog(false);
+      setVendorToUpdate(null);
+      setUpdateErrors({});
+      fetchVendorData(); // Refresh the list
     } catch (error) {
       console.error('Error updating vendor:', error);
-      showToast('Failed to update vendor. Please try again.', 'error');
+      const errorMessage = error.response?.data?.message || 'Failed to update vendor. Please try again.';
+      showToast(errorMessage, 'error');
     }
   };
 

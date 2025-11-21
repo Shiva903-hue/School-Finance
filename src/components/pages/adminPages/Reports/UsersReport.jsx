@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 export default function UsersReport() {
@@ -7,13 +8,10 @@ export default function UsersReport() {
   useEffect(() => {
     async function fetchUsersData() {
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "http://localhost:8001/api/reports/user-report"
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = response.data;
         console.log("Fetched users report data:", data);
         setUsersInfo(data);
       } catch (error) {

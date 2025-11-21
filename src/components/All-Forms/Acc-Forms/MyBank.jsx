@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { ArrowUpDown } from "lucide-react";
 
 export default function MyBank() {
   const [bankList, setBankList] = useState([]);
   const [filteredBankList, setFilteredBankList] = useState([]);
-  const [selectedFilter, setSelectedFilter] = useState("vendor");
+  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("desc"); // desc = newest first, asc = oldest first
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch bank data from API
+  // Fetch bank data
   useEffect(() => {
     const fetchBankData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch("http://localhost:8001/bank/list");
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/bank/list");
+        const data = response.data;
         console.log("Raw bank data from API:", data);
         
         // Handle different response structures
@@ -50,18 +53,33 @@ export default function MyBank() {
 
   // Filter banks based on selected type
   useEffect(() => {
+    let filtered = [];
     if (selectedFilter === "all") {
-      setFilteredBankList(bankList);
+      filtered = [...bankList];
     } else {
-      const filtered = bankList.filter(
+      filtered = bankList.filter(
         (bank) => bank.bank_type?.toLowerCase() === selectedFilter.toLowerCase()
       );
-      setFilteredBankList(filtered);
     }
-  }, [selectedFilter, bankList]);
+
+    // Sort by bank_id (newest/oldest)
+    filtered.sort((a, b) => {
+      if (sortOrder === "desc") {
+        return b.bank_id - a.bank_id; // Newest first (higher ID first)
+      } else {
+        return a.bank_id - b.bank_id; // Oldest first (lower ID first)
+      }
+    });
+
+    setFilteredBankList(filtered);
+  }, [selectedFilter, bankList, sortOrder]);
 
   const handleFilterChange = (e) => {
     setSelectedFilter(e.target.value);
+  };
+
+  const toggleSortOrder = () => {
+    setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
   };
 
   return (
@@ -79,19 +97,35 @@ export default function MyBank() {
           </div>
           
           {/* Filter Dropdown */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">
-              Filter by Type:
-            </label>
-            <select
-              value={selectedFilter}
-              onChange={handleFilterChange}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium bg-white"
-            >
-              <option value="all">All Banks</option>
-              <option value="vendor">Vendor Banks</option>
-              <option value="self">Self Banks</option>
-            </select>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Filter by Type:
+              </label>
+              <select
+                value={selectedFilter}
+                onChange={handleFilterChange}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium bg-white"
+              >
+                <option value="all">All Banks</option>
+                <option value="vendor">Vendor Banks</option>
+                <option value="self">Self Banks</option>
+              </select>
+            </div>
+
+            {/* Sort Order Button */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Sort by:
+              </label>
+              <button
+                onClick={toggleSortOrder}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                <ArrowUpDown className="w-4 h-4" />
+                {sortOrder === "desc" ? "Newest First" : "Oldest First"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

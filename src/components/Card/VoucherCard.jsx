@@ -1,4 +1,5 @@
 import React, { useState, useCallback, memo } from "react";
+import axios from "axios";
 import {
   CheckCircle,
   XCircle,
@@ -38,29 +39,13 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
     };
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      const response = await fetch(
+      const response = await axios.patch(
         `${API_BASE_URL}/${voucherData.voucher_id}`,
+        payload,
         {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
+          timeout: 10000 // 10s timeout
         }
       );
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP error! Status: ${response.status}`
-        );
-      }
 
       // Start disappearance animation
       setIsDisappearing(true);
@@ -73,10 +58,10 @@ const VoucherCard = memo(({ voucherData, onApprove, onReject }) => {
     } catch (error) {
       console.error(`Error ${status.toLowerCase()} voucher:`, error);
       
-      if (error.name === 'AbortError') {
+      if (error.code === 'ECONNABORTED') {
         setError('Request timeout. Please try again.');
       } else {
-        setError(error.message || 'An error occurred. Please try again.');
+        setError(error.response?.data?.message || error.message || 'An error occurred. Please try again.');
       }
       
       setIsProcessing(false);

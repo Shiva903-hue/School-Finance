@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { ChevronDown, ChevronUp, Filter, X } from "lucide-react";
 
 export default function VendorInfoReport() {
@@ -19,13 +20,10 @@ export default function VendorInfoReport() {
   useEffect(() => {
     async function fetchVendorData() {
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "http://localhost:8001/api/reports/vendor-report"
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = response.data;
         console.log("Fetched vendor report data:", data);
         setVendorInfo(data);
       } catch (error) {
@@ -36,9 +34,8 @@ export default function VendorInfoReport() {
     async function fetchCitiesAndStates() {
       // Fetch Cities
       try {
-        const citiesRes = await fetch("http://localhost:8001/api/dropdown/city");
-        if (!citiesRes.ok) throw new Error("Failed to fetch cities");
-        const citiesData = await citiesRes.json();
+        const citiesRes = await axios.get("http://localhost:8001/api/dropdown/city");
+        const citiesData = citiesRes.data;
         if (Array.isArray(citiesData)) setCities(citiesData);
         else if (Array.isArray(citiesData.data)) setCities(citiesData.data);
         else if (Array.isArray(citiesData.cities)) setCities(citiesData.cities);
@@ -49,9 +46,8 @@ export default function VendorInfoReport() {
 
       // Fetch States
       try {
-        const statesRes = await fetch("http://localhost:8001/api/dropdown/state");
-        if (!statesRes.ok) throw new Error("Failed to fetch states");
-        const statesData = await statesRes.json();
+        const statesRes = await axios.get("http://localhost:8001/api/dropdown/state");
+        const statesData = statesRes.data;
         if (Array.isArray(statesData)) setStates(statesData);
         else if (Array.isArray(statesData.data)) setStates(statesData.data);
         else if (Array.isArray(statesData.states)) setStates(statesData.states);

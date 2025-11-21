@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function VoucherForm() {
@@ -42,13 +43,10 @@ export default function VoucherForm() {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "http://localhost:8001/api/dropdown/vendor-names"
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = response.data;
         
         // Handle different response structures
         if (Array.isArray(data)) {
@@ -103,8 +101,8 @@ export default function VoucherForm() {
     if (selectedVendor) {
       setFormData((prevData) => ({
         ...prevData,
-        vendor_id: selectedVendor.vendor_id, // ✅ store vendor ID (for backend)
-        vendor_name: selectedVendor.vendor_name, // optional (display only)
+        vendor_id: selectedVendor.vendor_id,
+        vendor_name: selectedVendor.vendor_name, // disply only
       }));
       setErrors((prev) => ({ ...prev, vendor_name: "" }));
     }
@@ -134,36 +132,29 @@ export default function VoucherForm() {
     }
 
     try {
-      const res = await fetch(
+      const res = await axios.post(
         "http://localhost:8001/api/generate/purchase-voucher",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        }
+        formData
       );
-      const data = await res.json().catch(() => ({}));
+      const data = res.data;
       console.log("Backend response:", res.status, data);
 
-      if (res.ok) {
-        showToast("✅ Voucher created successfully!", "success");
+      showToast("✅ Voucher created successfully!", "success");
 
-        setFormData({
-          voucher_entry_date: getCurrentDate(),
-          voucher_status: "PENDING",
-          product_name: "",
-          product_qty: "",
-          product_rate: "",
-          product_amount: "",
-          vendor_id: "",
-        });
-        setErrors({});
-      } else {
-        showToast(data.message || "❌ Failed to create voucher", "error");
-      }
+      setFormData({
+        voucher_entry_date: getCurrentDate(),
+        voucher_status: "PENDING",
+        product_name: "",
+        product_qty: "",
+        product_rate: "",
+        product_amount: "",
+        vendor_id: "",
+      });
+      setErrors({});
     } catch (error) {
       console.error("Submission failed:", error);
-      showToast("❌ Network error occurred during submission", "error");
+      const errorMessage = error.response?.data?.message || "❌ Network error occurred during submission";
+      showToast(errorMessage, "error");
     }
     console.log("Submitting formData:", formData);
   };

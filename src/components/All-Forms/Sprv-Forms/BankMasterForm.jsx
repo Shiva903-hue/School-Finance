@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function BankMasterForm() {
@@ -57,19 +58,11 @@ export default function BankMasterForm() {
     }
 
     try {
-      const res = await fetch("http://localhost:5001/api/bankmaster", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        alert("✅ Bank details inserted successfully");
-        setFormData({ b_name: "", b_accno: "", b_ifsc: "", city: "", u_email: "", b_id: "" });
-        setErrors({});
-      } else {
-        alert("❌ Error sending request");
-      }
+      const res = await axios.post("http://localhost:5001/api/bankmaster", formData);
+      // alert("✅ Bank details inserted successfully");
+      console.log("✅ Bank details inserted successfully", res.data);
+      setFormData({ b_name: "", b_accno: "", b_ifsc: "", city: "", u_email: "", b_id: "" });
+      setErrors({});
     } catch (error) {
       console.error("Submission Error:", error);
       alert("❌ An error occurred while submitting the form.");

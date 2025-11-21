@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
@@ -22,10 +23,16 @@ export default function Usercreation() {
 
   //* Fetch roles from the API
   useEffect(() => {
-    fetch("http://localhost:8001/api/auth/roles")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) setRoles(data.roles);
+    axios
+      .get("http://localhost:8001/api/auth/roles")
+      .then((res) => {
+        const data = res.data;
+        if (data.success) {
+          let sortedRoles = data.roles.filter(
+            (role) => role.user_type_name.toLowerCase() !== "admin"
+          );
+          setRoles(sortedRoles);
+        }
       })
       .catch((err) => console.error("Error fetching roles:", err));
   }, []);
@@ -33,12 +40,12 @@ export default function Usercreation() {
   //* Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Restrict mobile field to numbers only
     if (name === "mobile" && value && !/^\d*$/.test(value)) {
-      return; // Don't update if non-numeric characters are entered
+      return;
     }
-    
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -49,9 +56,8 @@ export default function Usercreation() {
         ...prev,
         [name]: "",
       }));
-    
     }
-      validateField(name, value);
+    validateField(name, value);
   };
 
   //* Validate password match
@@ -88,19 +94,15 @@ export default function Usercreation() {
       return;
     }
 
-    // Remove confirmPassword before sending to API
+    // Remove confirmPassword before sending to backend
     const { confirmPassword: _confirmPassword, ...dataToSend } = formData;
 
     try {
-      const response = await fetch("http://localhost:8001/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dataToSend),
-      });
-
-      const result = await response.json();
+      const response = await axios.post(
+        "http://localhost:8001/api/auth/register",
+        dataToSend
+      );
+      const result = response.data;
 
       if (result.success) {
         toast.success("✅ User created successfully!");
@@ -109,7 +111,10 @@ export default function Usercreation() {
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      toast.error("❌ An error occurred while creating user");
+      const errorMessage =
+        error.response?.data?.message ||
+        "An error occurred while creating user";
+      toast.error(`❌ ${errorMessage}`);
     }
     // Reset form after a short delay
     setTimeout(() => {
@@ -126,7 +131,7 @@ export default function Usercreation() {
     }, 1500);
   };
 
-    //# ===================== Validation =====================
+  //# ===================== Validation =====================
   const validateField = (name, value) => {
     let error = "";
     if (!value) {
@@ -135,7 +140,10 @@ export default function Usercreation() {
       if (name === "mobile" && !/^\d{10}$/.test(value)) {
         error = "Enter a valid 10-digit number";
       }
-      if ((name === "password" || name === "confirmPassword") && (value.length < 4 || value.length > 8)) {
+      if (
+        (name === "password" || name === "confirmPassword") &&
+        (value.length < 4 || value.length > 8)
+      ) {
         error = "Password must be between 4 and 8 characters";
       }
       if (name === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
@@ -149,11 +157,8 @@ export default function Usercreation() {
   const renderError = (name) =>
     errors[name] && <p className="text-red-500 text-xs mt-1">{errors[name]}</p>;
 
-
-
   return (
     <div className="p-6 min-h-screen bg-gray-50 font-sans">
-        
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -198,7 +203,7 @@ export default function Usercreation() {
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
                 />
-                 {renderError("name")}
+                {renderError("name")}
               </div>
 
               <div>
@@ -206,7 +211,7 @@ export default function Usercreation() {
                   htmlFor="email"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Email Address  <span className="text-red-500">*</span>
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -218,7 +223,7 @@ export default function Usercreation() {
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#004aad]"
                 />
-                 {renderError("email")}
+                {renderError("email")}
               </div>
 
               <div>
@@ -226,7 +231,7 @@ export default function Usercreation() {
                   htmlFor="mobile"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Mobile Number  <span className="text-red-500">*</span>
+                  Mobile Number <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -249,7 +254,7 @@ export default function Usercreation() {
                   htmlFor="role"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Role  <span className="text-red-500">*</span>
+                  Role <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="role"
@@ -276,7 +281,7 @@ export default function Usercreation() {
                   htmlFor="password"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Password  <span className="text-red-500">*</span>
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -293,7 +298,9 @@ export default function Usercreation() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -313,7 +320,7 @@ export default function Usercreation() {
                   htmlFor="confirmPassword"
                   className="block mb-2 text-sm font-bold text-[#004aad]"
                 >
-                  Confirm Password  <span className="text-red-500">*</span>
+                  Confirm Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -330,7 +337,9 @@ export default function Usercreation() {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showConfirmPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="w-5 h-5" />

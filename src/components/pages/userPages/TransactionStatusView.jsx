@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import axios from "axios";
 import { CheckCircle, RefreshCw } from "lucide-react";
 import TransactionStatusCard from "../../Card/TransactionStatusCard";
 
@@ -22,11 +23,8 @@ export default function TransactionStatusView() {
   const fetchTransactionData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:8001/api/trns-info");
-      if (!res.ok) {
-        throw new Error(`Network response was not ok: ${res.status}`);
-      }
-      const data = await res.json();
+      const res = await axios.get("http://localhost:8001/api/trns-info");
+      const data = res.data;
       
       // Handle different response structures
       if (Array.isArray(data)) {

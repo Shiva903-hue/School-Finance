@@ -1,8 +1,8 @@
 import React, { useState , useCallback} from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function PetiCash() {
-  // const [bankList, setBankList] = useState([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     Vendor_name: "",
@@ -28,8 +28,14 @@ export default function PetiCash() {
     if (!value) {
       error = "This field is required";
     } else {
-      if (name === "Txn_Amount" && !/^\d+(\.\d{1,2})?$/.test(value)) {
-        error = "Enter a valid amount";
+      if (name === "Txn_Amount") {
+        if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+          error = "Enter a valid amount";
+        } else if (parseFloat(value) > 5000) {
+          error = "Amount cannot exceed ₹5,000";
+        } else if (parseFloat(value) <= 0) {
+          error = "Amount must be greater than 0";
+        }
       }
       if (name === "vendor_name" && !/^[a-zA-Z\s]+$/.test(value)) {
         error = "Only alphabets are allowed";
@@ -53,6 +59,13 @@ export default function PetiCash() {
   const handleConfirmedSubmit = async () => {
     setShowConfirmDialog(false);
     
+    // Check if amount exceeds 5000
+    const amount = parseFloat(formData.Txn_Amount);
+    if (amount > 5000) {
+      showToast("PettyCash transactions are limited to ₹5,000. Please enter an amount of ₹5,000 or less.", "error");
+      return;
+    }
+
     let isValid = true;
     Object.entries(formData).forEach(([name, value]) => {
       if (!validateField(name, value)) {
@@ -66,19 +79,11 @@ export default function PetiCash() {
     }
 
     try {
-      const res = await fetch("http://localhost:8001/api/transaction/peticash", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      if (res.ok) {
-          console.log("FormData being sent:", formData);
-        const responseData = await res.json();
-        console.log("Peti Cash transaction added:", responseData);
-        showToast("Peti Cash transaction added successfully!", "success");
-      } else {
-        showToast("Failed to add transaction. Please try again.", "error");
-      }
+      const res = await axios.post("http://localhost:8001/api/transaction/peticash", formData);
+      console.log("FormData being sent:", formData);
+      const responseData = res.data;
+      console.log("Peti Cash transaction added:", responseData);
+      showToast("Peti Cash transaction added successfully!", "success");
 
       setFormData({
         Vendor_name: "",
@@ -160,6 +165,7 @@ export default function PetiCash() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Transaction Amount <span className="text-red-500">*</span>
+                <span className="text-xs text-gray-500 ml-2">(Max: ₹5,000)</span>
               </label>
               <input
                 onChange={handleChange}

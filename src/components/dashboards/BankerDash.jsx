@@ -6,6 +6,7 @@ import WithdrawalForm from '../All-Forms/Acc-Forms/WithdrawalForm';
 import MyBank from '../All-Forms/Acc-Forms/MyBank';
 import Sidebar from "../pages/Sidebar";
 import TopNavbar from "../ui/TopNav";
+import UpdateCard from "../Card/UpdateCard";
 
 export default function BankerDash() {
   const [activeItem, setActiveItem] = useState("");
@@ -16,6 +17,7 @@ export default function BankerDash() {
     { id: 'Deposit', label: 'Deposit' },
     { id: 'Withdrawal', label: 'Withdrawal' },
     { id: 'MyBank', label: 'Banks' },
+    {id: 'Tasks', label: 'Tasks'},
   ];
 
   const handleItemClick = (itemId) => {
@@ -33,6 +35,8 @@ export default function BankerDash() {
         return <WithdrawalForm />;
       case "MyBank":
         return <MyBank />;
+      case "Tasks":
+        return <UpdateCard />;
       default:
         return (
           <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">

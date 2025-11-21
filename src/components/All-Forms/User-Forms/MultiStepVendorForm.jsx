@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import axios from "axios";
 import { X } from "lucide-react";
 
 export default function MultiStepVendorForm({ setVendorForm }) {
@@ -70,19 +71,12 @@ useEffect(() => {
     try {
       
       const [citiesRes, statesRes] = await Promise.all([
-        fetch("http://localhost:8001/api/dropdown/city"),
-        fetch("http://localhost:8001/api/dropdown/state"),
+        axios.get("http://localhost:8001/api/dropdown/city"),
+        axios.get("http://localhost:8001/api/dropdown/state"),
       ]);
 
-      // Check for response status
-      if (!citiesRes.ok) throw new Error("Failed to fetch cities");
-      if (!statesRes.ok) throw new Error("Failed to fetch states");
-
-      
-      const [citiesData, statesData] = await Promise.all([
-        citiesRes.json(),
-        statesRes.json(),
-      ]);
+      const citiesData = citiesRes.data;
+      const statesData = statesRes.data;
 
      
       const cityArray =
@@ -105,7 +99,6 @@ useEffect(() => {
       showToast("Failed to load dropdown data", "error");
       setCities([]);
       setStates([]);
-      // setFilteredCities([]);
     } finally {
       setCitiesLoading(false);
       setStatesLoading(false);
@@ -117,7 +110,7 @@ useEffect(() => {
 
 
   useEffect(() => {
-    if (currentStep !== 2) return; // Lazy-load: only fetch when user enters vendor step
+    if (currentStep !== 2) return;
 
     let cancelled = false;
     setVendorTypesLoading(true);
@@ -127,26 +120,21 @@ useEffect(() => {
       try {
         // Fetch both concurrently
         const [vendorTypesRes, banksRes] = await Promise.all([
-          fetch("http://localhost:8001/api/dropdown/vendor-types"),
-          fetch("http://localhost:8001/api/dropdown/banks"),
+          axios.get("http://localhost:8001/api/dropdown/vendor-types"),
+          axios.get("http://localhost:8001/api/dropdown/banks"),
         ]);
 
-        if (!vendorTypesRes.ok) throw new Error("Failed to fetch vendor types");
-        if (!banksRes.ok) throw new Error("Failed to fetch banks");
-
-        const [vendorTypesData, banksData] = await Promise.all([
-          vendorTypesRes.json(),
-          banksRes.json(),
-        ]);
+        const vendorTypesData = vendorTypesRes.data;
+        const banksData = banksRes.data;
 
         if (cancelled) return;
 
-        // Normalize vendor types
+     
         const vtArray = Array.isArray(vendorTypesData)
           ? vendorTypesData
           : vendorTypesData.data || vendorTypesData.vendorTypes || vendorTypesData.types || [];
 
-        // Normalize banks
+
         const bArray = Array.isArray(banksData)
           ? banksData
           : banksData.data || banksData.banks || [];
@@ -225,7 +213,7 @@ useEffect(() => {
     return isValid;
   };
 
-  // ===================== Input Handlers =====================
+  //# ===================== Input Handlers =====================
   const handleBankChange = (e) => {
     const { name, value } = e.target;
 
@@ -257,7 +245,7 @@ useEffect(() => {
     validateField(name, value);
   };
 
-  // ===================== Submit Handlers =====================
+  //# ===================== Submit Handlers =====================
   const handleBankSubmit = async () => {
     if (!validateStep(1)) {
       showToast("Please fill all required fields correctly", "error");
@@ -273,26 +261,18 @@ useEffect(() => {
     setShowConfirmation(false);
 
     try {
-      const response = await fetch("http://localhost:8001/api/bank/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bankDetails),
-      });
+      const response = await axios.post("http://localhost:8001/api/bank/add", bankDetails);
+      const result = response.data;
 
-      const result = await response.json();
-
-      if (response.ok) {
-        showToast("✅ Bank details submitted successfully!", "success");
+      showToast("✅ Bank details submitted successfully!", "success");
         console.log("Bank created with response:", result);
 
         // Note: Bank selection will be done via dropdown in vendor form
         setTimeout(() => setCurrentStep(2), 1000);
-      } else {
-        showToast(result.message || "❌ Failed to submit bank details", "error");
-      } 
-    } catch (error) {
+      } catch (error) {
       console.error("Error submitting bank details:", error);
-      showToast("❌ Server error while submitting bank details", "error");
+      const errorMessage = error.response?.data?.message || "❌ Server error while submitting bank details";
+      showToast(errorMessage, "error");
     }
   };
 
@@ -311,16 +291,10 @@ useEffect(() => {
     setShowConfirmation(false);
 
     try {
-      const response = await fetch("http://localhost:8001/api/vendor/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(vendorDetails),
-      });
+      const response = await axios.post("http://localhost:8001/api/vendor/add", vendorDetails);
+      const result = response.data;
 
-      const result = await response.json();
-
-      if (response.ok) {
-        showToast("✅ Vendor details submitted successfully!", "success");
+      showToast("✅ Vendor details submitted successfully!", "success");
         console.log("Vendor created with response:", result);
 
         setTimeout(() => {
@@ -351,12 +325,10 @@ useEffect(() => {
           setCurrentStep(1);
           setVendorForm(false);
         }, 2000);
-      } else {
-        showToast(result.message || "❌ Failed to submit vendor details", "error");
-      }
     } catch (error) {
       console.error("Error submitting vendor details:", error);
-      showToast("❌ Server error while submitting vendor details", "error");
+      const errorMessage = error.response?.data?.message || "❌ Server error while submitting vendor details";
+      showToast(errorMessage, "error");
     }
   };
 
@@ -364,7 +336,7 @@ useEffect(() => {
   const renderError = (name) =>
     errors[name] && <p className="text-red-500 text-xs mt-1">{errors[name]}</p>;
 
-  // ===================== Component JSX =====================
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
       {/* Toast Notification */}
@@ -632,7 +604,6 @@ useEffect(() => {
                     </div>
                   </div>
                 ) : (
-                  // Vendor Details
                   <div className="space-y-4">
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
                       Add Vendor Details
@@ -824,15 +795,6 @@ useEffect(() => {
 
               <div className="flex-shrink-0 sticky bottom-0 bg-white border-t border-gray-200 px-4 sm:px-6 py-4 rounded-b-2xl">
                 <div className="flex gap-3 justify-end">
-                  {/* {currentStep === 2 && (
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(1)}
-                      className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-medium"
-                    >
-                      Back
-                    </button>
-                  )} */}
 
                   {currentStep === 1 ? (
                     <button
@@ -859,3 +821,6 @@ useEffect(() => {
     </div>
   );
 }
+
+
+

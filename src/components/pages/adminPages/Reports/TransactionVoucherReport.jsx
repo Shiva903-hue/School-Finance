@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { Filter, X, ArrowUpDown } from "lucide-react";
 
 export default function TransactionVoucherReport() {
@@ -14,13 +15,10 @@ export default function TransactionVoucherReport() {
   useEffect(() => {
     async function fetchPettycashData() {
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "http://localhost:8001/api/reports/transaction-voucher-report"
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = response.data;
         setPurchaseInfo(data);
       } catch (error) {
         console.error("Fetch error:", error);

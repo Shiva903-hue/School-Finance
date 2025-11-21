@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import axios from "axios";
 import VoucherCard from "../../Card/VoucherCard";
 import { CheckCircle, RefreshCw, Loader2 } from 'lucide-react';
-// import axios from "axios";
 
 export default function PendingApproval() {
   const [vouchers, setVouchers] = useState([]);
@@ -19,20 +19,14 @@ export default function PendingApproval() {
   // Fetch vouchers from server with useCallback to prevent recreation
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8001/api/voucher-details", {
+      const res = await axios.get("http://localhost:8001/api/voucher-details", {
         // Add cache control for better performance
         headers: {
           'Cache-Control': 'no-cache'
         }
       });
       
-      if (!res.ok) {
-        console.log("vouchers --> HTTP error");
-        throw new Error(`HTTP error! status: ${res.status}`);
-
-      }
-
-      const data = await res.json();
+      const data = res.data;
       
       // Extract the voucherDetails array from the response
       const voucherArray = Array.isArray(data) 

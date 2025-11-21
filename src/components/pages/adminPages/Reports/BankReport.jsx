@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { ArrowUpDown } from "lucide-react";
 
 
 export default function BankReport() {
     const [bankList, setBankList] = useState([]);
     const [filteredBankList, setFilteredBankList] = useState([]);
     const [selectedFilter, setSelectedFilter] = useState("all");
+    const [sortOrder, setSortOrder] = useState("desc"); // desc = newest first, asc = oldest first
     const [isLoading, setIsLoading] = useState(false);
 
       // Fetch bank data from API
@@ -12,8 +15,8 @@ export default function BankReport() {
         const fetchBankData = async () => {
           setIsLoading(true);
           try {
-            const response = await fetch("http://localhost:8001/bank/list");
-            const data = await response.json();
+            const response = await axios.get("http://localhost:8001/bank/list");
+            const data = response.data;
             console.log("Raw bank data from API:", data);
             
             // Handle different response structures
@@ -51,18 +54,33 @@ export default function BankReport() {
     
       // Filter banks based on selected type
       useEffect(() => {
+        let filtered = [];
         if (selectedFilter === "all") {
-          setFilteredBankList(bankList);
+          filtered = [...bankList];
         } else {
-          const filtered = bankList.filter(
+          filtered = bankList.filter(
             (bank) => bank.bank_type?.toLowerCase() === selectedFilter.toLowerCase()
           );
-          setFilteredBankList(filtered);
         }
-      }, [selectedFilter, bankList]);
+
+        // Sort by bank_id (newest/oldest)
+        filtered.sort((a, b) => {
+          if (sortOrder === "desc") {
+            return b.bank_id - a.bank_id; // Newest first (higher ID first)
+          } else {
+            return a.bank_id - b.bank_id; // Oldest first (lower ID first)
+          }
+        });
+
+        setFilteredBankList(filtered);
+      }, [selectedFilter, bankList, sortOrder]);
     
       const handleFilterChange = (e) => {
         setSelectedFilter(e.target.value);
+      };
+
+      const toggleSortOrder = () => {
+        setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
       };
     
   return (
@@ -86,6 +104,20 @@ export default function BankReport() {
               <option value="vendor">Vendor Banks</option>
               <option value="self">Self Banks</option>
             </select>
+          </div>
+
+          {/* Sort Order Button */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">
+              Sort by:
+            </label>
+            <button
+              onClick={toggleSortOrder}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              {sortOrder === "desc" ? "Newest First" : "Oldest First"}
+            </button>
           </div>
         </div>
       </div>

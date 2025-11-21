@@ -1,4 +1,5 @@
 import React, { useState, useCallback, memo } from "react";
+import axios from "axios";
 import {
   CheckCircle,
   XCircle,
@@ -36,50 +37,34 @@ const TransactionApprovalCard = memo(({ transactionData, onApprove, onReject }) 
     };
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      const response = await fetch(
-        `${API_BASE_URL}/${transactionData.voucher_id}`,
+      const response = await axios.patch(
+        `${API_BASE_URL}/${transactionData.transaction_id}`,
+        payload,
         {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
+          timeout: 10000 // 10s timeout
         }
       );
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP error! Status: ${response.status}`
-        );
-      }
 
       // Start disappearance animation
       setIsDisappearing(true);
 
       // Notify parent component after animation
       setTimeout(() => {
-        callback(transactionData.voucher_id);
+        callback(transactionData.transaction_id);
       }, 300);
 
     } catch (error) {
       console.error(`Error ${status.toLowerCase()} transaction:`, error);
       
-      if (error.name === 'AbortError') {
+      if (error.code === 'ECONNABORTED') {
         setError('Request timeout. Please try again.');
       } else {
-        setError(error.message || 'An error occurred. Please try again.');
+        setError(error.response?.data?.message || error.message || 'An error occurred. Please try again.');
       }
       
       setIsProcessing(false);
     }
-  }, [isProcessing, transactionData.voucher_id, transactionData.transaction_details, API_BASE_URL, transactionDetails]);
+  }, [isProcessing, transactionData.transaction_id, transactionData.transaction_details, API_BASE_URL, transactionDetails]);
 
   //* HANDLE APPROVE
   const handleApprove = useCallback(() => {
@@ -153,7 +138,7 @@ const TransactionApprovalCard = memo(({ transactionData, onApprove, onReject }) 
                 Confirm {confirmAction === 'APPROVED' ? 'Approval' : 'Rejection'}
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to {confirmAction === 'APPROVED' ? 'approve' : 'reject'} transaction for voucher #{transactionData.voucher_id}?
+                Are you sure you want to {confirmAction === 'APPROVED' ? 'approve' : 'reject'} transaction #{transactionData.transaction_id} (Voucher #{transactionData.voucher_id})?
               </p>
               
               {/* Transaction Details Input */}

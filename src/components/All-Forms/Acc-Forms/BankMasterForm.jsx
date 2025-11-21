@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function BankMasterForm() {
@@ -42,8 +43,8 @@ export default function BankMasterForm() {
     
     setIsCheckingAccount(true);
     try {
-      const response = await fetch(`http://localhost:8001/api/bank/check-account/${accountNumber}`);
-      const result = await response.json();
+      const response = await axios.get(`http://localhost:8001/api/bank/check-account/${accountNumber}`);
+      const result = response.data;
       
       if (result.exists) {
         setErrors((prev) => ({ 
@@ -73,13 +74,14 @@ export default function BankMasterForm() {
       // Fetch Cities
       setCitiesLoading(true);
       try {
-        const citiesRes = await fetch("http://localhost:8001/api/dropdown/city");
-        if (!citiesRes.ok) throw new Error("Failed to fetch cities");
-        const citiesData = await citiesRes.json();
+        const citiesRes = await axios.get("http://localhost:8001/api/dropdown/city");
+        const citiesData = citiesRes.data;
+
         if (Array.isArray(citiesData)) setCities(citiesData);
         else if (Array.isArray(citiesData.data)) setCities(citiesData.data);
         else if (Array.isArray(citiesData.cities)) setCities(citiesData.cities);
         else setCities([]);
+
       } catch (error) {
         console.error("Error fetching cities:", error);
         showToast("Failed to load cities", "error");
@@ -90,9 +92,8 @@ export default function BankMasterForm() {
       // Fetch States
       setStatesLoading(true);
       try {
-        const statesRes = await fetch("http://localhost:8001/api/dropdown/state");
-        if (!statesRes.ok) throw new Error("Failed to fetch states");
-        const statesData = await statesRes.json();
+        const statesRes = await axios.get("http://localhost:8001/api/dropdown/state");
+        const statesData = statesRes.data;
         if (Array.isArray(statesData)) setStates(statesData);
         else if (Array.isArray(statesData.data)) setStates(statesData.data);
         else if (Array.isArray(statesData.states)) setStates(statesData.states);
@@ -136,7 +137,7 @@ export default function BankMasterForm() {
       setFormData({
         ...formData,
         state_id: Number(value),
-        city_id: "", // Reset city selection
+        city_id: "",
       });
     } else {
       setFormData({
@@ -147,12 +148,12 @@ export default function BankMasterForm() {
     
     validateField(name, value);
     
-    // Check account number uniqueness on blur (debounced check)
+    // Check account number uniqueness
     if (name === "bank_account_no" && value.length >= 9) {
       // Clear previous timeout if exists
       const timeoutId = setTimeout(() => {
         checkAccountNumberExists(value);
-      }, 500); // Debounce for 500ms
+      }, 500);
       
       return () => clearTimeout(timeoutId);
     }
@@ -189,37 +190,29 @@ export default function BankMasterForm() {
     }
 
     try {
-      const response = await fetch("http://localhost:8001/api/bank/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      const response = await axios.post("http://localhost:8001/api/bank/add", formData);
+      const result = response.data;
+
+      showToast("Bank details added successfully!", "success");
+      console.log("Bank created with response:", result);
+      
+      // Reset form
+      setFormData({
+        bank_name: "",
+        bank_account_no: "",
+        bank_ifsc: "",
+        bank_branch: "",
+        city_id: "",
+        state_id: "",
+        bank_address: "",
+        bank_type: "Self",
+        bank_amount: ""
       });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        showToast("Bank details added successfully!", "success");
-        console.log("Bank created with response:", result);
-        
-        // Reset form
-        setFormData({
-          bank_name: "",
-          bank_account_no: "",
-          bank_ifsc: "",
-          bank_branch: "",
-          city_id: "",
-          state_id: "",
-          bank_address: "",
-          bank_type: "Self",
-          bank_amount: ""
-        });
-        setErrors({});
-      } else {
-        showToast(result.message || "Failed to add bank details", "error");
-      }
+      setErrors({});
     } catch (error) {
       console.error("Submission Error:", error);
-      showToast("Server error while submitting bank details", "error");
+      const errorMessage = error.response?.data?.message || "Server error while submitting bank details";
+      showToast(errorMessage, "error");
     }
   };
 

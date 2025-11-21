@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function WithdrawalForm() {
@@ -7,23 +8,17 @@ export default function WithdrawalForm() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     u_email: "",
-    // w_id: "",
     w_amount: "",
     bank_select: "",
     mode_withdraw: "",
-    // cheque_number: "",
-    // cheque_date: "",
   });
 
   //* Fetch Bank Names form My Bank Table
   useEffect(() => {
     const fetchVouchers = async () => {
       try {
-        const response = await fetch("http://localhost:5001/get/mybankname");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/get/mybankname");
+        const data = response.data;
         setBankName(data);
       } catch (e) {
         console.error(
@@ -81,7 +76,7 @@ export default function WithdrawalForm() {
         formData.mode_withdraw !== "Cheque" &&
         (name === "cheque_number" || name === "cheque_date")
       ) {
-        return; // Skip validation for hidden cheque fields
+        return; 
       }
       if (!validateField(name, value)) {
         isValid = false;
@@ -133,22 +128,7 @@ export default function WithdrawalForm() {
             Withdrawal Details
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* w_id */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Withdrawal ID <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="w_id"
-                value={formData.w_id}
-                onChange={handleChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter withdrawal ID"
-                required
-              />
-              {renderError("w_id")}
-            </div> */}
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Amount <span className="text-red-500">*</span>

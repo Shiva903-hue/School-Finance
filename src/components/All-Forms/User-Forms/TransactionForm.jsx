@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function TransactionForm() {
@@ -49,9 +50,8 @@ export default function TransactionForm() {
   const validateField = (name, value, type) => {
     let error = "";
 
-    // Treat empty strings/null/undefined as missing (unless allowed)
+    // Treat empty strings/null/undefined as missing 
     if (value === "" || value === null || value === undefined) {
-      //transaction_details is optional in your original logic
       if (name !== "transaction_details") {
         error = "This field is required";
       }
@@ -73,26 +73,32 @@ export default function TransactionForm() {
     const fetchDropdownData = async () => {
       try {
         //* Vouchers
-        const voucherRes = await fetch(
+        const voucherRes = await axios.get(
           "http://localhost:8001/api/dropdown/voucher-ids"
         );
-        const voucherJson = await voucherRes.json();
-        // accept different response shapes
+        const voucherJson = voucherRes.data;
+        console.log("Fetched vouchers raw response:", voucherJson);
+        
+        // Extract array from different possible response shapes
+        let voucherArray = [];
         if (voucherJson && Array.isArray(voucherJson.voucherIDs)) {
-          setVoucherData(voucherJson.voucherIDs);
+          voucherArray = voucherJson.voucherIDs;
         } else if (Array.isArray(voucherJson.data)) {
-          setVoucherData(voucherJson.data);
+          voucherArray = voucherJson.data;
         } else if (Array.isArray(voucherJson)) {
-          setVoucherData(voucherJson);
-        } else {
-          setVoucherData([]);
+          voucherArray = voucherJson;
         }
+        
+        // Filter for approved vouchers only
+        const ApprovedVouchers = voucherArray.filter((v) => v.voucher_status === "APPROVED");
+        console.log("Approved Vouchers:", ApprovedVouchers);
+        setVoucherData(ApprovedVouchers);
 
         //* Transaction types
-        const typeRes = await fetch(
+        const typeRes = await axios.get(
           "http://localhost:8001/api/dropdown/transaction-types"
         );
-        const typeJson = await typeRes.json();
+        const typeJson = typeRes.data;
         console.log("Fetched transaction types:", typeJson);
 
         if (typeJson && Array.isArray(typeJson.transactionTypes)) {
@@ -106,8 +112,8 @@ export default function TransactionForm() {
         }
 
         //* Self Banks
-        const bankRes = await fetch("http://localhost:8001/bank/self");
-        const bankJson = await bankRes.json();
+        const bankRes = await axios.get("http://localhost:8001/bank/self");
+        const bankJson = bankRes.data;
         console.log("Fetched banks raw response:", bankJson);
 
         const bankArray = Array.isArray(bankJson)
@@ -172,18 +178,15 @@ export default function TransactionForm() {
         const typeName = selectedType.transaction_type.toLowerCase();
         console.log("Transaction type name:", typeName);
 
-        const shouldShowBank =
-          typeName === "cheque" ||
-          typeName === "dd" ||
-          typeName === "demand draft" ||
+        const shouldShowBank = typeName === "cheque" || typeName === "dd" || typeName === "demand draft" ||
           typeName === "rtgs";
 
-        console.log("Should show bank dropdown:", shouldShowBank);
+        console.log(" show bank dropdown:", shouldShowBank);
         console.log("Bank list in state:", bankList);
 
         setShowBankDropdown(shouldShowBank);
 
-        // Set bank_id to null for Cash, empty string for others (to be selected)
+        // Set bank_id to null for Cash, empty string for others
         if (!shouldShowBank) {
           setFormData((prev) => ({ ...prev, bank_id: null }));
           // Clear bank validation error if exists
@@ -198,14 +201,13 @@ export default function TransactionForm() {
       }
     }
 
-    // Determine type for validation (number for amounts)
+    // Determine type for validation
     const type = ["trns_amount", "P_amount"].includes(name) ? "number" : "text";
-    // Note: transaction_details can be optional, but we still validate when not empty
     const error = validateField(name, value, type);
     setErrors((prev) => ({ ...prev, [name]: error }));
   };
 
-  // ---- Submit handler (send only required six fields) ----
+  //* ---- Submit handler ----
   const handleSubmit = async (e) => {
     e.preventDefault();
     setShowConfirmDialog(true);
@@ -229,12 +231,12 @@ export default function TransactionForm() {
     const tempErrors = {};
     let isValid = true;
     for (const [name, value] of Object.entries(payload)) {
-      // Skip bank_id validation if it's null (Cash transaction)
+
       if (name === "bank_id" && value === null) {
         continue;
       }
 
-      // choose validation type: only numeric check for amounts if any (none here except bank/voucher ids)
+      // choose validation type: only numeric check for amounts if any
       const type = ["trns_amount", "P_amount"].includes(name)
         ? "number"
         : "text";
@@ -253,14 +255,10 @@ export default function TransactionForm() {
     }
 
     try {
-      const res = await fetch("http://localhost:8001/api/request/transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await axios.post("http://localhost:8001/api/request/transaction", payload);
 
-      const data = await res.json().catch(() => null);
-      if (res.ok && data && data.success) {
+      const data = res.data;
+      if (data && data.success) {
         showToast("Transaction submitted successfully!", "success");
 
         setFormData({

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import ConfirmationDialog from "../../ui/ConfirmationDialog";
 
 export default function WithdrawalForm() {
@@ -27,11 +28,8 @@ export default function WithdrawalForm() {
     const fetchDropdownData = async () => {
       // Fetch Banks
       try {
-        const response = await fetch("http://localhost:8001/bank/self");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/bank/self");
+        const data = response.data;
         const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
         console.log("Fetched banks:", bankArray);
         setBankName(bankArray);
@@ -42,11 +40,8 @@ export default function WithdrawalForm() {
 
       // Fetch Transaction Types
       try {
-        const response = await fetch("http://localhost:8001/api/dropdown/transaction-types");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/api/dropdown/transaction-types");
+        const data = response.data;
         const typesArray = Array.isArray(data) ? data : data.transactionTypes || data.data || [];
         console.log("Fetched transaction types:", typesArray);
         setTransactionTypes(typesArray);
@@ -67,7 +62,7 @@ export default function WithdrawalForm() {
     if (value === "" || value === null || value === undefined) {
       error = "This field is required";
     } else {
-      // Validation for amount (numeric only, allows decimals)
+      // Validation for amount
       if (name === "Txn_amount") {
         if (!/^\d+(\.\d{1,2})?$/.test(value)) {
            error = "Only non-negative numbers are allowed";
@@ -167,32 +162,24 @@ export default function WithdrawalForm() {
     };
     
     try {
-      const res = await fetch('http://localhost:8001/api/withdrawal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
+      const res = await axios.post('http://localhost:8001/api/withdrawal', payload);
+      const result = res.data;
       
-      if (res.ok) {
-        showToast(result.message || "Withdrawal submitted successfully!", "success");
-        // Reset form
-        setFormData({
-          Txn_amount: "",
-          Bank_id: "",
-          transaction_type_id: "",
-          transaction_date: "",
-          cheque_dd_number: "",
-          rtgs_number: ""
-        });
-        setErrors({});
-      } else {
-        showToast(result.message || "Failed to submit withdrawal", "error");
-      }
+      showToast(result.message || "Withdrawal submitted successfully!", "success");
+      // Reset form
+      setFormData({
+        Txn_amount: "",
+        Bank_id: "",
+        transaction_type_id: "",
+        transaction_date: "",
+        cheque_dd_number: "",
+        rtgs_number: ""
+      });
+      setErrors({});
     } catch (err) {
       console.error('Error:', err);
-      showToast('Failed to submit withdrawal. Please check if server is running.', "error");
+      const errorMessage = err.response?.data?.message || 'Failed to submit withdrawal. Please check if server is running.';
+      showToast(errorMessage, "error");
     }
   };
 

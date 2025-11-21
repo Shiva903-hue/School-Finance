@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 export default function PeticashReport() {
@@ -15,17 +16,14 @@ export default function PeticashReport() {
   useEffect(() => {
     async function fetchPettycashData() {
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "http://localhost:8001/api/reports/pettycash-report"
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = response.data;
         console.log("Fetched pettycash report data:", data);
         setPettycash(data);
-      } catch (error) {
-        console.error("Fetch error:", error);
+      } catch(error){
+        console.log("this is err",error)
       }
     }
 

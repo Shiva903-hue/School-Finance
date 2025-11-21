@@ -1,5 +1,6 @@
 import wallet from '../../../assets/wallet.png'
 import React,{useState,useEffect} from "react";
+import axios from "axios";
 
 export default function Balance() {
   const [bankList, setBankList] = useState([]);
@@ -8,9 +9,9 @@ export default function Balance() {
   const [showBalance, setShowBalance] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:8001/bank/self")
-      .then((response) => response.json())
-      .then((data) => {
+    axios.get("http://localhost:8001/bank/self")
+      .then((response) => {
+        const data = response.data;
         // Handle different response formats
         const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
         console.log("Fetched banks:", bankArray);
@@ -29,8 +30,8 @@ export default function Balance() {
     if (selectedBankId) {
       // Fetch fresh data from server
       try {
-        const response = await fetch("http://localhost:8001/bank/self");
-        const data = await response.json();
+        const response = await axios.get("http://localhost:8001/bank/self");
+        const data = response.data;
         const bankArray = Array.isArray(data) ? data : data.bankDetails || data.banks || data.data || [];
         setBankList(bankArray); // Update the bank list with fresh data
         

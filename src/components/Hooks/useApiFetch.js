@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function useApiFetch(options) {
   const { url, autoFetch = true } = options;
@@ -17,16 +18,8 @@ function useApiFetch(options) {
     setError(null);
 
     try {
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(
-          `HTTP Error: ${response.status} - ${response.statusText}`
-        );
-      }
-
-      const result = await response.json();
-      setData(result);
+      const response = await axios.get(url);
+      setData(response.data);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error occurred');
       setError(error);

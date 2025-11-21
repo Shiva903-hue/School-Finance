@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { Filter, X, ArrowUpDown } from "lucide-react";
 
 export default function DepositReport() {
@@ -14,13 +15,10 @@ export default function DepositReport() {
   useEffect(() => {
     async function fetchPettycashData() {
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "http://localhost:8001/api/reports/self-transaction-report"
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = response.data;
         console.log("Fetched pettycash report data:", data);
         // Filter only Deposit transactions
         const depositOnly = data.filter(item => item.Txn_type === "Deposit");
